@@ -66,6 +66,10 @@ COPY scripts/ ./scripts/
 # 创建日志和下载目录
 RUN mkdir -p /app/logs /app/screenshots
 
+# 复制启动脚本
+COPY scripts/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # 暴露端口
 EXPOSE 8000
 
@@ -74,4 +78,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:8000/api/health || exit 1
 
 # 启动命令
-CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["/entrypoint.sh"]

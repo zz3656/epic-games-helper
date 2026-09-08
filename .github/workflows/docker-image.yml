@@ -7,7 +7,9 @@ on:
     paths:
       - 'app/**'
       - 'Dockerfile'
+      - 'scripts/entrypoint.sh'
       - 'requirements.txt'
+      - 'docker-compose.yml'
       - '.github/workflows/docker-image.yml'
       - '.github/workflows/dockerhub-readme.md'
   workflow_dispatch:  # 支持手动触发

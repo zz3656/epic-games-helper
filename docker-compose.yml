@@ -7,22 +7,7 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
-    # 推荐通过 .env 文件管理敏感配置（不入 git）
-    env_file:
-      - .env
     environment:
-      # 调度时间：每周四 17:00 北京时间（Epic 通常在此时放出免费游戏）
-      - TZ=Asia/Shanghai
-      - SCHEDULE_DAY=thu
-      - SCHEDULE_HOUR=17
-      - SCHEDULE_MINUTE=0
-      # 浏览器 headless 模式（true=无头，false=有头，调试用）
-      - HEADLESS=true
-      # 日志级别
-      - LOG_LEVEL=INFO
-      # 是否启动时自动开启"自动领取"（需要凭证已配置）
-      - AUTO_CLAIM_ENABLED=true
-      # ⚠️ EPIC_MASTER_KEY 已在 .env 文件中管理，不要直接写在这里
     volumes:
       # 仅挂载日志、截图、数据，账号密码密文在 /app/data 下
       - ./logs:/app/logs
