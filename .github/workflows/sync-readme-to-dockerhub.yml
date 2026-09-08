@@ -1,0 +1,87 @@
+name: Sync README to Docker Hub
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/dockerhub-readme.md'
+      - '.github/workflows/sync-readme-to-dockerhub.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Update Docker Hub repository description
+        env:
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_SHORT_DESC: Epic Games 免费游戏自动领取 · Docker + Playwright · 输入一次每周自动执行。
+        run: |
+          python3 << 'PYEOF'
+          import json, os, urllib.request, urllib.error
+
+          short_desc = os.environ.get("DOCKERHUB_SHORT_DESC", "")
+          full_description = open(".github/workflows/dockerhub-readme.md", "r", encoding="utf-8").read()
+          dockerhub_username = os.environ.get("DOCKERHUB_USERNAME", "")
+          dockerhub_token = os.environ.get("DOCKERHUB_TOKEN", "")
+
+          if not dockerhub_username or not dockerhub_token:
+              print("❌ 缺少 DOCKERHUB_USERNAME / DOCKERHUB_TOKEN 环境变量")
+              exit(1)
+
+          # description 字段上限 100 字节(中文 3 字节/字,必须截断)
+          short_desc = short_desc.encode("utf-8")[:100].decode("utf-8", errors="ignore")
+
+          # 1. Docker Hub JWT 登录(token 作为 password)
+          login_payload = json.dumps({"username": dockerhub_username, "password": dockerhub_token}).encode("utf-8")
+          login_req = urllib.request.Request(
+              "https://hub.docker.com/v2/users/login/",
+              data=login_payload,
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          try:
+              with urllib.request.urlopen(login_req, timeout=30) as resp:
+                  jwt = json.loads(resp.read().decode("utf-8"))["token"]
+          except urllib.error.HTTPError as e:
+              print(f"❌ Docker Hub 登录失败 (HTTP {e.code}): {e.read().decode()[:300]}")
+              exit(1)
+
+          # 2. PATCH 更新仓库描述
+          data = {
+              "full_description": full_description,
+              "description": short_desc,
+              "short_description": short_desc,
+          }
+          payload = json.dumps(data, ensure_ascii=False).encode("utf-8")
+          url = f"https://hub.docker.com/v2/repositories/{dockerhub_username}/epic-games-claimer"
+
+          req = urllib.request.Request(
+              url,
+              data=payload,
+              headers={"Authorization": f"JWT {jwt}", "Content-Type": "application/json"},
+              method="PATCH",
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=30) as resp:
+                  code = resp.getcode()
+                  if code in (200, 201):
+                      print(f"✅ Docker Hub description updated!")
+                      print(f"   https://hub.docker.com/r/{dockerhub_username}/epic-games-claimer")
+                  else:
+                      print(f"⚠️ Unexpected status: {code}")
+                      exit(1)
+          except urllib.error.HTTPError as e:
+              print(f"❌ 更新失败 (HTTP {e.code}): {e.read().decode()[:300]}")
+              exit(1)
+          except Exception as e:
+              print(f"❌ 错误: {e}")
+              exit(1)
+          PYEOF
