@@ -212,9 +212,11 @@ function showClaimResult(box, data) {
                 tips: [
                     "Epic 检测到异常环境，弹出 hCaptcha 验证",
                     "点击下方的截图链接查看验证页面",
-                    "如需手动验证：设置环境变量 HEADLESS=false 重启容器，在可见模式下手动点击",
+                    data.vnc_enabled ? "✓ VNC 已启用：新窗口打开 http://服务器IP:6080/vnc.html 手动完成验证" : "⚠ 未启用 VNC：需修改 docker-compose.yml 添加 ENABLE_VNC=true 重启",
+                    "完成后领取任务会自动继续（等待最多 120 秒）",
                     "或等待 5-10 分钟后重试（hCaptcha 冷却）",
                 ],
+                vncLink: data.vnc_enabled ? (window.location.protocol + "//" + window.location.hostname + ":6080/vnc.html") : null,
             },
             network_error: {
                 icon: "📡",
@@ -244,12 +246,38 @@ function showClaimResult(box, data) {
         };
         const info = loginStatusMap[data.login_status] || loginStatusMap.unknown;
         const tipsHtml = info.tips.map(t => `• ${escapeHtml(t)}`).join("<br>");
+        const vncSection = info.vncLink ? `
+            <div class="vnc-cta" style="margin-top:14px; padding:12px; background:rgba(123,47,247,0.15); border-left:3px solid #7b2ff7; border-radius:8px;">
+                <div style="font-weight:600; margin-bottom:6px;">🎯 打开 noVNC 手动验证 hCaptcha</div>
+                <a href="${escapeHtml(info.vncLink)}" target="_blank" style="display:inline-block; padding:8px 14px; background:linear-gradient(90deg,#7b2ff7,#00d4ff); color:#fff; border-radius:8px; text-decoration:none; font-weight:600; font-size:14px;">
+                    🖥️ 点击这里打开 noVNC
+                </a>
+                <div style="margin-top:8px; font-size:12px; opacity:0.8;">URL: ${escapeHtml(info.vncLink)}</div>
+                <div style="margin-top:6px; font-size:12px; opacity:0.7;">在打开的页面中完成 hCaptcha 后，领取任务会自动继续</div>
+            </div>
+        ` : (data.login_status === "captcha_required" ? `
+            <div class="vnc-cta" style="margin-top:14px; padding:12px; background:rgba(251,191,36,0.15); border-left:3px solid #fbbf24; border-radius:8px;">
+                <div style="font-weight:600; margin-bottom:6px;">⚠️ 未启用 VNC，无法手动验证</div>
+                <div style="font-size:13px; line-height:1.6;">
+                    1. 编辑 <code>docker-compose.yml</code>，添加环境变量：<br>
+                    <code style="display:block; margin:6px 0; padding:6px; background:rgba(0,0,0,0.3); border-radius:4px;">
+                        environment:<br>
+                        &nbsp;&nbsp;- ENABLE_VNC=true<br>
+                        &nbsp;&nbsp;- VNC_PASSWORD=你的密码（可选）
+                    </code>
+                    2. 添加端口映射：<code>6080:6080</code><br>
+                    3. 重启容器：<code>docker compose up -d</code><br>
+                    4. 重试领取任务，将自动弹出 noVNC 验证链接
+                </div>
+            </div>
+        ` : '');
         box.innerHTML = `
             <div class="result-title"><strong>${info.icon} ${escapeHtml(info.title)}</strong></div>
             <div class="result-error">${escapeHtml(data.error || "")}</div>
             <div class="result-hint" style="margin-top:10px;">
                 💡 建议：<br>${tipsHtml}
             </div>
+            ${vncSection}
             ${data.screenshot_path ? (() => { const fn = escapeHtml(data.screenshot_path.split('/').pop()); return `<div class="result-hint">📸 截图: <a href="/api/screenshots/${fn}" target="_blank" style="color:#00d4ff;">${escapeHtml(data.screenshot_path)}</a> <a href="#" data-toggle-preview="${fn}" style="color:#7b2ff7; margin-left:8px;">[查看/隐藏]</a></div><div class="screenshot-preview" data-preview-for="${fn}" style="margin-top:8px; display:none;"><img src="/api/screenshots/${fn}" style="max-width:100%; border-radius:8px; border:1px solid rgba(255,255,255,0.1);"/></div>`; })() : ''}
         `;
         bindScreenshotToggle(box);

@@ -152,6 +152,30 @@ async def health():
     }
 
 
+@app.get("/api/vnc/status")
+async def vnc_status():
+    """查询 VNC 服务状态（供前端检测是否启用了 VNC）"""
+    import os
+    import subprocess
+    enabled = os.getenv("ENABLE_VNC", "false").lower() == "true"
+    # 检查进程是否存在
+    vnc_running = False
+    novnc_running = False
+    try:
+        ps = subprocess.run(["ps", "-ef"], capture_output=True, text=True, timeout=5)
+        vnc_running = "x11vnc" in ps.stdout
+        novnc_running = "websockify" in ps.stdout or "novnc" in ps.stdout
+    except Exception:
+        pass
+    return {
+        "enabled": enabled,
+        "vnc_running": vnc_running,
+        "novnc_running": novnc_running,
+        "novnc_url": "/vnc.html" if novnc_running else None,
+        "vnc_password_set": bool(os.getenv("VNC_PASSWORD")),
+    }
+
+
 async def _progress_callback(claim_id: str, step: str, status: str):
     """进度回调：桥接 claimer → claim_progress"""
     track_progress(claim_id, step, status)
@@ -277,19 +301,6 @@ async def pending_verification_status():
     }
 
 
-@app.get("/api/claim/progress/{claim_id}")
-async def claim_progress_endpoint(claim_id: str):
-    """查询领取进度（轮询接口）"""
-    progress = claim_progress.get(claim_id)
-    if not progress:
-        raise HTTPException(status_code=404, detail="任务不存在或已过期")
-    # 如果进度已完成，附加完整结果
-    if progress.get("status") == "done":
-        # 清理旧进度
-        claim_progress.pop(claim_id, None)
-    return JSONResponse(content=progress)
-
-
 # ----- 凭证管理 -----
 @app.post("/api/credentials")
 async def save_credentials(req: SaveCredentialsRequest):
@@ -394,6 +405,8 @@ async def history_latest():
 
 # ============== 工具 ==============
 def _result_to_dict(result) -> dict:
+    import os
+    vnc_enabled = os.getenv("ENABLE_VNC", "false").lower() == "true"
     return {
         "success": result.success,
         "username": result.username,
@@ -406,6 +419,7 @@ def _result_to_dict(result) -> dict:
         ) != "" and (result.login_status or "") != "success",
         "login_status": getattr(result, "login_status", "") or "",
         "needs_verification": (getattr(result, "login_status", "") or "") == "needs_verification",
+        "vnc_enabled": vnc_enabled,
         "games": [
             {
                 "title": g.title, "url": g.url,
