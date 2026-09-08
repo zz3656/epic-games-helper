@@ -2,23 +2,26 @@
 Epic Games 游戏抓取与领取逻辑（从 claimer.py 拆出，控制单文件行数）
 
 包含：
-- _fetch_free_games: 从商店页抓取所有可领取的免费游戏
-- _claim_one: 访问单个游戏页并尝试领取
+- fetch_free_games: 从商店页抓取所有可领取的免费游戏
+- claim_one: 访问单个游戏页并尝试领取
 """
 import asyncio
 import logging
-from typing import List
+from typing import TYPE_CHECKING, List
 
 from playwright.async_api import Page, TimeoutError as PWTimeout
 
-from app.claimer import EpicClaimer, FreeGame
+if TYPE_CHECKING:
+    from app.claimer import EpicClaimer
 
 logger = logging.getLogger(__name__)
 
 
-async def fetch_free_games(claimer: EpicClaimer, page: Page) -> List[FreeGame]:
+async def fetch_free_games(claimer: "EpicClaimer", page: Page) -> List:
+    from app.claimer import FreeGame  # runtime import to avoid circular dependency
+
     """访问免费游戏页，解析当前可领取的游戏"""
-    games: List[FreeGame] = []
+    games = []
     try:
         await page.goto(claimer.STORE_URL, wait_until="domcontentloaded", timeout=60000)
     except PWTimeout:
@@ -33,7 +36,7 @@ async def fetch_free_games(claimer: EpicClaimer, page: Page) -> List[FreeGame]:
     except PWTimeout:
         logger.warning("未找到免费游戏卡片")
 
-    # 通过 JS 抓取所有"现在免费"区域的游戏链接
+    # 通过 JS 抓取所有可领取的游戏链接
     hrefs = await page.evaluate("""
     () => {
         const results = [];
@@ -43,7 +46,6 @@ async def fetch_free_games(claimer: EpicClaimer, page: Page) -> List[FreeGame]:
             const href = a.href;
             if (seen.has(href)) continue;
             seen.add(href);
-            // 只保留带 product 页的链接
             if (/\\/(p|free-games)\\/[a-z0-9-]+/i.test(href)) {
                 const title = (
                     a.getAttribute('aria-label') ||
@@ -57,21 +59,17 @@ async def fetch_free_games(claimer: EpicClaimer, page: Page) -> List[FreeGame]:
         return results;
     }
     """)
-    for item in hrefs or []:
-        games.append(FreeGame(title=item.get("title", "未知游戏"), url=item.get("url", "")))
-
-    # 去重
     seen = set()
-    unique = []
-    for g in games:
-        if g.url in seen:
+    for item in hrefs or []:
+        url = item.get("url", "")
+        if url in seen:
             continue
-        seen.add(g.url)
-        unique.append(g)
-    return unique
+        seen.add(url)
+        games.append(FreeGame(title=item.get("title", "未知游戏"), url=url))
+    return games
 
 
-async def claim_one(claimer: EpicClaimer, page: Page, url: str) -> tuple:
+async def claim_one(claimer: "EpicClaimer", page: Page, url: str) -> tuple:
     """访问游戏页并尝试领取。返回 (status, message)"""
     try:
         await page.goto(url, wait_until="domcontentloaded", timeout=60000)
