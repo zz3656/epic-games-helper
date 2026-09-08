@@ -4,6 +4,8 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docker](https://img.shields.io/badge/Docker-ready-blue.svg)](https://www.docker.com/)
+[![Docker Pulls](https://img.shields.io/docker/pulls/zz3656/epic-games-claimer.svg?style=flat)](https://hub.docker.com/r/zz3656/epic-games-claimer)
+[![Multi-arch](https://img.shields.io/badge/arch-amd64%20%7C%20arm64-lightgrey.svg)](https://hub.docker.com/r/zz3656/epic-games-claimer)
 
 ---
 
@@ -11,11 +13,11 @@
 
 | 功能 | 说明 |
 |---|---|
-| 🎯 **Web 可视化界面** | 浏览器打开即用，账号密码可视化输入 |
-| 🔒 **隐私零留存模式** | 账号密码仅在请求内存中使用，不写文件 / 不进日志 |
-| 🔁 **自动领取模式** | 账号密码 Fernet (AES-128) 加密持久化，每周自动执行 |
-| 🐳 **一键 Docker 部署** | 容器化运行，环境隔离，安全加固 |
-| ⏰ **APScheduler 调度** | 可配置每周任意时间触发（默认周四 17:00 北京时间） |
+| 🌐 **Web 可视化界面** | 浏览器打开即用，账号密码可视化输入 |
+| 🔓 **立即领取** | 每次手动输入账号密码，领取完即清，零留存 |
+| 🔁 **自动领取** | 输入一次，每周自动跑；Fernet (AES-128-CBC) 加密存储 |
+| 🐳 **零配置启动** | 首次启动自动生成密钥，无需手动创建 `.env` |
+| ⏰ **可调度** | 支持配置每周任意时间触发（默认周四 17:00 北京时间） |\
 | 📊 **历史记录** | 查看过往领取结果（已脱敏） |
 | 🛡️ **安全加固** | 容器无特权模式、资源限制、加密文件 0600 权限 |
 
@@ -23,22 +25,17 @@
 
 ## 🚀 快速开始
 
-### 1. 生成 master key（仅"自动领取"模式需要）
+### 零配置部署（推荐）
 
-```bash
-python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-```
+**容器首次启动时会自动生成 `EPIC_MASTER_KEY`**，无需手动创建 `.env` 文件！
 
-把输出粘贴到 `.env` 文件的 `EPIC_MASTER_KEY=...`。
-
-### 2. Docker Run
+### Docker Run
 
 ```bash
 docker pull zz3656/epic-games-claimer:latest
 
 docker run -d \
   --name epic-claimer \
-  --env-file .env \
   -p 8000:8000 \
   -v $(pwd)/logs:/app/logs \
   -v $(pwd)/screenshots:/app/screenshots \
@@ -47,7 +44,14 @@ docker run -d \
   zz3656/epic-games-claimer:latest
 ```
 
-### 3. Docker Compose
+查看生成的密钥：
+```bash
+docker logs epic-claimer 2>&1 | grep EPIC_MASTER_KEY
+# 或直接查看：
+cat ./data/.env
+```
+
+### Docker Compose
 
 ```yaml
 services:
@@ -57,7 +61,6 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
-    env_file: .env
     environment:
       - TZ=Asia/Shanghai
       - SCHEDULE_DAY=thu
@@ -70,6 +73,11 @@ services:
       - ./data:/app/data
     security_opt:
       - no-new-privileges:true
+```
+
+启动：
+```bash
+docker compose up -d
 ```
 
 ### 4. 访问 Web 界面
@@ -87,7 +95,7 @@ services:
 |---|---|
 | 账号密码（立即领取模式） | 仅请求作用域内，函数返回后 GC 回收 |
 | 账号密码（自动领取模式） | Fernet (AES-128-CBC + HMAC) 加密 + 0600 权限 |
-| Master key | 通过 `.env` 文件管理，**不入 git** |
+| Master key | 容器首次启动自动生成，持久化到 `./data/.env` |
 | Cookie / Session | 每次新 BrowserContext，领取后立即销毁 |
 | 日志 | 永不记录完整密码；用户名已脱敏 |
 
@@ -99,7 +107,7 @@ services:
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
-| `EPIC_MASTER_KEY` | *必填* | Fernet 密钥（自动领取模式） |
+| `EPIC_MASTER_KEY` | *自动生成* | Fernet 密钥（首次运行时自动生成） |
 | `TZ` | `Asia/Shanghai` | 时区 |
 | `SCHEDULE_DAY` | `thu` | 触发日（mon-sun） |
 | `SCHEDULE_HOUR` | `17` | 触发小时 |
@@ -107,6 +115,22 @@ services:
 | `HEADLESS` | `true` | 浏览器无头模式 |
 | `LOG_LEVEL` | `INFO` | 日志级别 |
 | `AUTO_CLAIM_ENABLED` | `false` | 启动时自动开启自动领取 |
+
+### 自定义密钥
+
+容器首次运行后，编辑 `./data/.env` 修改 `EPIC_MASTER_KEY`，然后重启：
+```bash
+docker compose restart
+```
+
+---
+
+## 🛣️ 多架构支持
+
+| 架构 | 支持 |
+|---|---|
+| linux/amd64 | ✅ |
+| linux/arm64 | ✅ |
 
 ---
 
@@ -118,10 +142,13 @@ services:
 
 **Master key 变更后凭证无法解密**：
 ```bash
-# 1. 进入容器删除旧凭证
-docker exec -it epic-games-claimer rm /app/data/credentials.enc
+# 1. 删除旧凭证
+rm ./data/credentials.enc
 # 2. Web 界面重新保存凭证
 ```
+
+**想自定义密钥？**
+容器首次运行后，编辑 `./data/.env` 修改 `EPIC_MASTER_KEY`，然后 `docker compose restart`。
 
 ---
 

@@ -2,28 +2,34 @@
 
 基于 **Docker + Playwright** 的 Epic Games 周免游戏自动领取服务。
 
-## ✨ 两种运行模式
+## ✨ 功能特性
 
-| 模式 | 用法 | 隐私性 | 自动执行 |
-|------|------|--------|----------|
-| 🔓 **立即领取**（默认） | 每次手动输入账号密码领取 | ⭐⭐⭐⭐⭐ 零留存 | ❌ 需手动 |
-| 🔁 **保存凭证·自动领取** | 输入一次，每周自动跑 | ⭐⭐⭐⭐ AES 加密存储 | ✅ 完全自动 |
+| 功能 | 说明 |
+|------|------|
+| 🌐 **Web 可视化界面** | 浏览器打开即用，账号密码可视化输入 |
+| 🔓 **立即领取** | 每次手动输入账号密码，领取完即清，零留存 |
+| 🔁 **自动领取** | 输入一次，每周自动跑；Fernet (AES-128-CBC) 加密存储 |
+| 🐳 **零配置启动** | 首次启动自动生成密钥，无需手动创建 `.env` |
+| ⏰ **可调度** | 支持配置每周任意时间触发（默认周四 17:00 北京时间） |
+| 📊 **历史记录** | 查看过往领取结果（已脱敏） |
+| 🛡️ **安全加固** | 容器无特权模式、资源限制、加密文件 0600 权限 |
 
 ## 🚀 快速开始
 
-### 1. 生成 master key
+### 1. 启动
 
 ```bash
-python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+docker compose up -d
 ```
 
-把输出粘贴到 `.env` 文件的 `EPIC_MASTER_KEY=...`。
+> 💡 **无需手动创建 `.env` 文件！** 容器首次启动时会自动生成 `EPIC_MASTER_KEY` 并保存到 `./data/.env`。
 
-### 2. 启动
+查看生成的密钥：
 
 ```bash
-docker compose build
-docker compose up -d
+docker compose logs | grep EPIC_MASTER_KEY
+# 或直接查看文件：
+cat ./data/.env
 ```
 
 打开：**http://localhost:8000**
@@ -95,35 +101,39 @@ FastAPI 进程
 ```
 epicgames/
 ├── app/
-│   ├── main.py                # FastAPI 入口
+│   ├── main.py                # FastAPI 入口 + API 路由
 │   ├── claimer.py             # Playwright 领取核心
-│   ├── scheduler.py           # 定时调度（支持凭证模式）
+│   ├── scheduler.py           # APScheduler 定时调度
 │   ├── credential_store.py    # 🔒 Fernet 加密凭证存取
 │   ├── storage.py             # 结果存储（白名单字段）
-│   ├── config.py              # 配置
-│   ├── templates/index.html   # Web 模板（双模式）
-│   └── static/                # CSS / JS
-├── scripts/build-and-run.sh
-├── data/                      # 凭证密文（容器内，gitignore）
-├── logs/                      # 领取日志
-├── screenshots/               # 异常截图
+│   └── config.py              # 环境变量配置
+├── scripts/
+│   ├── build-and-run.sh       # 本地构建脚本
+│   └── entrypoint.sh          # 🐳 容器启动入口（自动生成密钥）
 ├── Dockerfile
 ├── docker-compose.yml
-├── .env                       # master key 等敏感配置（gitignore）
 ├── .env.example               # 配置模板
-└── requirements.txt
+├── .env                       # 密钥文件（自动生成，gitignore）
+├── requirements.txt
+├── logs/                      # 领取日志
+├── screenshots/               # 异常截图
+└── data/                      # 凭证密文持久化目录
 ```
 
-## ⚙️ 配置（通过 .env）
+## ⚙️ 配置
+
+所有配置通过环境变量管理。容器首次启动时会自动生成 `EPIC_MASTER_KEY` 并写入 `./data/.env`，后续启动自动读取。
+
+### 环境变量
 
 | 变量 | 默认 | 说明 |
 |------|------|------|
-| `EPIC_MASTER_KEY` | *必填* | Fernet 密钥 |
+| `EPIC_MASTER_KEY` | *自动生成* | Fernet 密钥（首次运行时生成） |
 | `TZ` | `Asia/Shanghai` | 时区 |
 | `SCHEDULE_DAY` | `thu` | 周几触发（mon-sun） |
 | `SCHEDULE_HOUR` | `17` | 触发小时 |
 | `SCHEDULE_MINUTE` | `0` | 触发分钟 |
-| `HEADLESS` | `true` | 浏览器无头 |
+| `HEADLESS` | `true` | 浏览器无头模式 |
 | `LOG_LEVEL` | `INFO` | 日志级别 |
 | `AUTO_CLAIM_ENABLED` | `false` | 启动时自动开启自动领取 |
 
@@ -160,7 +170,14 @@ ERROR 解密失败：master key 与凭证不匹配
 
 ### 3. 容器重启后自动领取失败
 
-检查 `.env` 中的 `EPIC_MASTER_KEY` 是否持久（容器外）。
+检查 `./data/.env` 中的 `EPIC_MASTER_KEY` 是否持久（持久化在宿主机 `data` 目录）。
+
+### 4. 想自定义密钥？
+
+容器首次运行后，编辑 `./data/.env` 修改 `EPIC_MASTER_KEY`，然后重启：
+```bash
+docker compose restart
+```
 
 ## ⚠️ 免责声明
 
