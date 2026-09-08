@@ -134,45 +134,11 @@ class LoginHandler:
 
     def __init__(self, parent):
         self.parent = parent
-
-    async def _try_solve_hcaptcha(self, page, target) -> bool:
-        """尝试自动点击 hCaptcha checkbox
-
-        hCaptcha 包含嵌套 iframe，需先切到 host frame 再切到 challenge frame。
-        简单 checkbox 点击可能触发图片挑战 — 那需要图像识别，无法自动完成。
-        返回 True 表示成功点击，False 表示失败。
-        """
-        try:
-            iframe_selectors = [
-                'iframe[src*="hcaptcha.com"][src*="checkbox"]',
-                'iframe[src*="hcaptcha.com"]',
-            ]
-            for iframe_sel in iframe_selectors:
-                iframe_handle = await page.query_selector(iframe_sel)
-                if not iframe_handle:
-                    continue
-                frame = await iframe_handle.content_frame()
-                if not frame:
-                    continue
-                checkbox_selectors = [
-                    '#checkbox',
-                    '.checkmark',
-                    '[id*="checkbox"]',
-                    'div[role="checkbox"]',
-                ]
-                for cb_sel in checkbox_selectors:
-                    try:
-                        cb = await frame.query_selector(cb_sel)
-                        if cb:
-                            await cb.click()
-                            logger.info("hCaptcha checkbox 已点击: %s", cb_sel)
-                            return True
-                    except Exception:
-                        continue
-            return False
-        except Exception as e:
-            logger.warning("自动点击 hCaptcha 失败: %s", e)
-            return False
+        # hCaptcha 处理（拆分到 claimer_captcha.py）
+        from app.claimer_captcha import try_solve_hcaptcha, wait_for_manual_captcha_solve, is_vnc_enabled
+        self._try_solve_hcaptcha = try_solve_hcaptcha
+        self._wait_for_manual_captcha_solve = wait_for_manual_captcha_solve
+        self._vnc_enabled = is_vnc_enabled
 
     def _classify_error(self, page_text: str, current_url: str) -> LoginResult:
         """根据页面文本和 URL 分类失败原因"""
@@ -396,12 +362,28 @@ class LoginHandler:
                         )
                         await asyncio.sleep(2)
                         continue  # 重新检查结果
+
+                # 自动解决失败。
+                # 检查是否启用了 VNC，如果是，等待用户手动验证
+                if self._vnc_enabled():
+                    logger.warning("VNC 已启用，等待用户手动验证 hCaptcha（120秒）")
+                    await self.parent._save_screenshot(page, "login_captcha_waiting")
+                    solved = await self._wait_for_manual_captcha_solve(page, timeout_seconds=120)
+                    if solved:
+                        # 验证完成，尝试重新提交登录
+                        logger.info("重新提交登录表单")
+                        await self.parent._click_first_available(
+                            target, self.SUBMIT_BUTTON_SELECTORS
+                        )
+                        await asyncio.sleep(2)
+                        continue
+
                 # 自动解决失败，提示用户手动处理
                 logger.warning("hCaptcha 自动解决失败，需手动处理")
                 await self.parent._save_screenshot(page, "login_captcha")
                 return LoginResult(
                     status=LoginStatus.CAPTCHA_REQUIRED,
-                    reason="Epic 要求完成图形验证码 (hCaptcha)。可设置 HEADLESS=false 以可见模式运行手动验证，或等待几分钟后重试",
+                    reason="Epic 要求完成图形验证码 (hCaptcha)。如设置了 ENABLE_VNC=true，请通过 noVNC (6080 端口) 手动验证；否则等待几分钟后重试",
                     screenshot_tag="login_captcha",
                 )
 

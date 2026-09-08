@@ -136,6 +136,8 @@ epicgames/
 | `HEADLESS` | `true` | 浏览器无头模式 |
 | `LOG_LEVEL` | `INFO` | 日志级别 |
 | `AUTO_CLAIM_ENABLED` | `false` | 启动时自动开启自动领取 |
+| `ENABLE_VNC` | `false` | 启动 VNC 服务（手动验证 hCaptcha 用） |
+| `VNC_PASSWORD` | *(空)* | VNC 访问密码（不设置则无密码） |
 
 ## 🛠️ API
 

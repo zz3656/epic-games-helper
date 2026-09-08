@@ -68,5 +68,38 @@ else
     exit 1
 fi
 
+# ============================================
+# 可选 VNC 服务（用于手动解决 hCaptcha）
+# ============================================
+if [ "${ENABLE_VNC:-false}" = "true" ]; then
+    echo "[INFO] ENABLE_VNC=true, starting VNC server..."
+    # 启动虚拟显示
+    Xvfb :99 -screen 0 1440x900x24 -ac &
+    XVFB_PID=$!
+    sleep 2
+    export DISPLAY=:99
+    # 启动 x11vnc（带密码则使用密码，未设置则不加密码）
+    if [ -n "$VNC_PASSWORD" ]; then
+        mkdir -p /root/.vnc
+        x11vnc -storepasswd "$VNC_PASSWORD" /root/.vnc/passwd
+        x11vnc -display :99 -forever -rfbauth /root/.vnc/passwd -nopw -quiet &
+    else
+        x11vnc -display :99 -forever -nopw -quiet &
+    fi
+    sleep 1
+    # 启动 noVNC（端口 6080）
+    if [ -d "/usr/share/novnc" ]; then
+        websockify --web=/usr/share/novnc 6080 localhost:5900 &
+    else
+        websockify 6080 localhost:5900 &
+    fi
+    sleep 1
+    echo "[INFO] VNC server started:"
+    echo "[INFO]   noVNC URL: http://localhost:6080/vnc.html"
+    echo "[INFO]   VNC port: 5900"
+fi
+
+# ============================================
 # 启动 uvicorn
+# ============================================
 exec python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
