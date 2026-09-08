@@ -2,7 +2,7 @@
 Epic Games 游戏抓取与领取逻辑（从 claimer.py 拆出，控制单文件行数）
 
 包含：
-- fetch_free_games: 从商店页抓取所有可领取的免费游戏
+- fetch_free_games: 从商店首页抓取本周主推的免费游戏
 - claim_one: 访问单个游戏页并尝试领取
 """
 import asyncio
@@ -20,53 +20,76 @@ logger = logging.getLogger(__name__)
 async def fetch_free_games(claimer: "EpicClaimer", page: Page) -> List:
     from app.claimer import FreeGame  # runtime import to avoid circular dependency
 
-    """访问免费游戏页，解析当前可领取的游戏"""
+    """访问商店首页，抓取本周主推免费游戏（首页推荐区）"""
     games = []
     try:
-        await page.goto(claimer.STORE_URL, wait_until="domcontentloaded", timeout=60000)
+        # 使用首页而非 free-games 页，首页推荐区只显示本周免费游戏
+        await page.goto("https://store.epicgames.com/zh-CN", wait_until="domcontentloaded", timeout=60000)
     except PWTimeout:
-        logger.error("访问商店页超时")
+        logger.error("访问商店首页超时")
         return games
 
-    # 等待游戏卡片加载
+    # 等待首页加载
     try:
-        await page.wait_for_selector(
-            'a[href*="/free-games/"], a[href*="/p/"]', timeout=30000
-        )
+        await page.wait_for_selector('[data-testid="featured"]', timeout=30000)
     except PWTimeout:
-        logger.warning("未找到免费游戏卡片")
+        logger.warning("未找到 featured 区域，尝试备用选择器")
 
-    # 通过 JS 抓取所有可领取的游戏链接
-    hrefs = await page.evaluate("""
+    # 通过 JS 从首页推荐区提取免费游戏
+    games_data = await page.evaluate("""
     () => {
         const results = [];
-        const links = document.querySelectorAll('a[href*="/p/"], a[href*="/free-games/"]');
+
+        // 查找首页推荐轮播中带有"免费"标签的游戏卡片
+        const selectors = [
+            // data-path 属性指向游戏页的卡片
+            '[data-path*="/p/"]',
+            // 通用的游戏卡片链接
+            'a[href*="/p/"]',
+        ];
+
         const seen = new Set();
-        for (const a of links) {
-            const href = a.href;
-            if (seen.has(href)) continue;
-            seen.add(href);
-            if (/\\/(p|free-games)\\/[a-z0-9-]+/i.test(href)) {
-                const title = (
-                    a.getAttribute('aria-label') ||
-                    a.querySelector('span')?.innerText ||
-                    a.innerText ||
-                    ''
-                ).trim();
-                if (title) results.push({title, url: href});
-            }
+
+        for (const sel of selectors) {
+            document.querySelectorAll(sel).forEach(a => {
+                const href = a.href;
+                if (!href || seen.has(href)) return;
+                if (!/\\/(p|free-games)\\/[a-z0-9-]+/i.test(href)) return;
+                seen.add(href);
+
+                const text = (a.innerText || '').trim();
+                const ariaLabel = (a.getAttribute('aria-label') || '').trim();
+                const combined = text + ' ' + ariaLabel;
+
+                // 只保留带有"免费"标识的
+                if (/免费|Free|NOW FREE|免费下载/i.test(combined)) {
+                    const title = ariaLabel ||
+                        a.querySelector('[class*="Title"]')?.innerText?.trim() ||
+                        a.querySelector('[class*="Title"]')?.textContent?.trim() ||
+                        text || '';
+                    if (title) {
+                        results.push({ title, url: href });
+                    }
+                }
+            });
         }
+
         return results;
     }
     """)
+
+    for item in games_data or []:
+        games.append(FreeGame(title=item.get("title", "未知游戏"), url=item.get("url", "")))
+
+    # 去重
     seen = set()
-    for item in hrefs or []:
-        url = item.get("url", "")
-        if url in seen:
+    unique = []
+    for g in games:
+        if g.url in seen:
             continue
-        seen.add(url)
-        games.append(FreeGame(title=item.get("title", "未知游戏"), url=url))
-    return games
+        seen.add(g.url)
+        unique.append(g)
+    return unique
 
 
 async def claim_one(claimer: "EpicClaimer", page: Page, url: str) -> tuple:
