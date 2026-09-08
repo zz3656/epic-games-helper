@@ -178,14 +178,76 @@ function showClaimResult(box, data) {
     // 登录失败
     if (data.login_failed) {
         box.className = "result error";
+        // 根据登录失败类型显示不同的图标和建议
+        const loginStatusMap = {
+            invalid_credentials: {
+                icon: "🔑",
+                title: "账号或密码错误",
+                tips: [
+                    "请检查账号（邮箱）和密码是否输入正确",
+                    "注意区分大小写",
+                    "如刚改过密码，请用新密码重试",
+                ],
+            },
+            account_locked: {
+                icon: "🚫",
+                title: "账号被锁定",
+                tips: [
+                    "Epic 检测到异常活动已锁定账号",
+                    "请前往 https://www.epicgames.com 手动解锁",
+                    "或联系 Epic 客服：https://www.epicgames.com/help",
+                ],
+            },
+            rate_limit: {
+                icon: "⏱️",
+                title: "登录频率超限",
+                tips: [
+                    "尝试次数过多，请等待 5-15 分钟后再试",
+                    "本次领取任务已取消",
+                ],
+            },
+            captcha_required: {
+                icon: "🧩",
+                title: "需要图形验证码",
+                tips: [
+                    "Epic 要求完成 hCaptcha 验证",
+                    "请在本地浏览器手动登录一次以通过验证",
+                    "验证后会自动信任本设备",
+                ],
+            },
+            network_error: {
+                icon: "📡",
+                title: "网络连接失败",
+                tips: [
+                    "无法访问 Epic 登录页",
+                    "请检查容器网络连接 / DNS 配置",
+                    "可能需要配置代理",
+                ],
+            },
+            page_changed: {
+                icon: "🔧",
+                title: "Epic 登录页结构变化",
+                tips: [
+                    "Epic 更新了登录页，本项目暂时无法识别",
+                    "请前往 GitHub 提交 issue 等待适配",
+                ],
+            },
+            unknown: {
+                icon: "❓",
+                title: "登录失败，原因未知",
+                tips: [
+                    "请查看截图了解详情",
+                    "可尝试在本地浏览器登录一次以信任本设备",
+                ],
+            },
+        };
+        const info = loginStatusMap[data.login_status] || loginStatusMap.unknown;
+        const tipsHtml = info.tips.map(t => `• ${escapeHtml(t)}`).join("<br>");
         box.innerHTML = `
-            <div class="result-title"><strong>🔒 登录失败</strong></div>
+            <div class="result-title"><strong>${info.icon} ${escapeHtml(info.title)}</strong></div>
             <div class="result-error">${escapeHtml(data.error || "")}</div>
             <div class="result-hint" style="margin-top:10px;">
-                💡 请检查：<br>
-                • Epic 账号密码是否正确<br>
-                • 是否开启了双因素认证<br>
-                • Epic 是否要求验证码（需手动登录一次）
+                💡 建议：<br>${tipsHtml}
             </div>
             ${data.screenshot_path ? `<div class="result-hint">📸 截图: ${escapeHtml(data.screenshot_path)}</div>` : ''}
         `;

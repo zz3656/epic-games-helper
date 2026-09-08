@@ -22,7 +22,7 @@ from playwright.async_api import (
 )
 
 from app.claimer_games import fetch_free_games, claim_one
-from app.claimer_login import LoginHandler
+from app.claimer_login import LoginHandler, LoginStatus
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +44,7 @@ class ClaimResult:
     started_at: str = ""
     finished_at: str = ""
     screenshot_path: Optional[str] = None
+    login_status: str = ""           # LoginStatus 之一（SUCCESS / INVALID_CREDENTIALS / 等）
 
 
 async def _emit(callback, step: str, status: str):
@@ -213,22 +214,28 @@ class EpicClaimer:
             # 1) 登录（关键步骤：登录失败则终止后续领取）
             if progress_fn:
                 await _emit(progress_fn, "🔐 正在登录 Epic…", "active")
-            login_status = await self._login_handler.login(page, verification_code)
+            login_result = await self._login_handler.login(page, verification_code)
 
-            if login_status == "needs_verification":
+            if login_result.status == LoginStatus.NEEDS_VERIFICATION:
                 result.error = "需要邮箱验证：Epic 要求邮箱验证码。请检查邮箱获取验证码后重新提交，或在本地手动登录一次以信任本设备"
-                result.screenshot_path = await self._save_screenshot(page, "verification_required")
+                result.screenshot_path = login_result.screenshot_tag and await self._save_screenshot(
+                    page, login_result.screenshot_tag
+                )
+                result.login_status = LoginStatus.NEEDS_VERIFICATION
                 if progress_fn:
                     await _emit(progress_fn, "🔐 需要邮箱验证", "done")
                 return result
 
-            if login_status != "success":
+            if login_result.status != LoginStatus.SUCCESS:
                 # 登录失败 -> 硬终止，后续步骤不执行
-                result.error = "登录失败：账号或密码错误，或 Epic 登录页结构变化。后续领取已取消，请检查账号密码后重试"
-                result.screenshot_path = await self._save_screenshot(page, "login_failed")
+                result.error = login_result.reason
+                result.screenshot_path = login_result.screenshot_tag and await self._save_screenshot(
+                    page, login_result.screenshot_tag
+                )
+                result.login_status = login_result.status
                 if progress_fn:
-                    await _emit(progress_fn, "🔒 登录失败，已取消领取", "done")
-                logger.error("[%s] 登录失败，终止后续流程", result.username)
+                    await _emit(progress_fn, f"🔒 登录失败：{login_result.reason}", "done")
+                logger.error("[%s] 登录失败: %s，终止后续流程", result.username, login_result.reason)
                 return result
 
             if progress_fn:

@@ -398,9 +398,10 @@ def _result_to_dict(result) -> dict:
         "finished_at": result.finished_at,
         "screenshot_path": result.screenshot_path,
         "login_failed": result.success is False and result.games == [] and (
-            result.error or ""
-        ).startswith("登录失败"),
-        "needs_verification": (result.error or "").startswith("需要邮箱验证"),
+            result.login_status or ""
+        ) != "" and (result.login_status or "") != "success",
+        "login_status": getattr(result, "login_status", "") or "",
+        "needs_verification": (getattr(result, "login_status", "") or "") == "needs_verification",
         "games": [
             {
                 "title": g.title, "url": g.url,
