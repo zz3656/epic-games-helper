@@ -85,14 +85,24 @@ class LoginHandler:
     ERROR_PATTERNS = {
         # 账号/密码错误
         LoginStatus.INVALID_CREDENTIALS: [
-            "密码错误", "密码不正确", "密码无效",
+            # 中文
+            "密码错误", "密码不正确", "密码无效", "密码有误",
             "账号不存在", "账号无效", "账号错误",
-            "用户名或密码", "邮箱或密码",
+            "用户名或密码", "邮箱或密码", "邮箱或密码错误",
+            "邮箱和密码", "邮件地址或密码", "电子邮件地址或密码不正确",
+            "密码与账号不匹配", "账号或密码有误",
+            # 英文（Epic 实际使用）
             "invalid credentials", "invalid password", "invalid email",
             "incorrect password", "incorrect email", "incorrect username",
-            "invalid login", "wrong password", "wrong email",
+            "invalid login", "invalid sign in", "invalid signin",
+            "wrong password", "wrong email", "wrong credentials",
             "do not match", "doesn't match", "not recognized",
-            "电子邮件地址或密码不正确",
+            "your email or password", "email or password is incorrect",
+            "your password is incorrect", "your email is incorrect",
+            "sign in failed", "login failed", "登录失败",
+            "credentials", "incorrect email or password",
+            "email address or password is incorrect",
+            "please check your email and password",
         ],
         # 账号被锁定
         LoginStatus.ACCOUNT_LOCKED: [
@@ -100,18 +110,20 @@ class LoginHandler:
             "账户锁定", "账户已冻结", "账户被禁用",
             "account locked", "account disabled", "account suspended",
             "locked out", "too many failed", "已暂停", "永久禁用",
+            "your account has been", "account is locked",
         ],
         # 频率限制
         LoginStatus.RATE_LIMIT: [
             "尝试次数过多", "频繁登录", "操作过于频繁", "请稍后再试",
             "too many attempts", "too many requests", "rate limit",
             "try again later", "too many login", "暂时无法",
-            "slow down", "请过几分钟",
+            "slow down", "请过几分钟", "rate limited",
+            "throttled", "try again in",
         ],
         # 图形验证码
         LoginStatus.CAPTCHA_REQUIRED: [
             "captcha", "验证码", "hCaptcha", "hcaptcha", "recaptcha",
-            "reCAPTCHA", "are you human", "请完成验证",
+            "reCAPTCHA", "are you human", "请完成验证", "human verification",
         ],
         # 验证提示
         LoginStatus.NEEDS_VERIFICATION: [
@@ -252,7 +264,17 @@ class LoginHandler:
                 screenshot_tag="login_page_changed",
             )
 
-        # 7) 等待响应
+        # 7) 点击登录后立即抓取错误状态（Epic 错误提示是 toast，几秒后消失）
+        # 先等 2-3 秒让 Epic 响应（点击后页面状态稳定）
+        await asyncio.sleep(3)
+
+        # 抓取点击后立即的错误信息
+        immediate_text = await self.parent._get_page_text(page)
+        immediate_url = page.url
+        # 保存点击后的截图（包含 Epic 错误提示）
+        await self.parent._save_screenshot(page, "login_after_submit")
+
+        # 8) 等待响应（多轮轮询）
         for attempt_idx in range(3):
             try:
                 await page.wait_for_url(
@@ -260,7 +282,7 @@ class LoginHandler:
                         "store.epicgames.com" in url
                         or "epicgames.com/account" in url
                     ),
-                    timeout=15000,
+                    timeout=8000,
                 )
                 logger.info("登录成功（URL 跳转）")
                 return LoginResult(
@@ -288,9 +310,12 @@ class LoginHandler:
             current_url = page.url
             page_text = await self.parent._get_page_text(page)
 
+            # 合并第一次抓取的文本（捕获初始 toast 错误）
+            combined_text = page_text + " " + immediate_text
+
             # 检查邮箱验证（单独处理）
             for prompt in self.VERIFICATION_PROMPT_TEXTS:
-                if prompt in page_text:
+                if prompt in combined_text:
                     logger.warning("检测到邮箱验证: %s", prompt)
                     await self.parent._save_screenshot(page, "verification_required")
                     return LoginResult(
@@ -327,17 +352,27 @@ class LoginHandler:
                 () => !!document.querySelector('input[type="password"], input[name="password"]')
                 """)
                 if still_has_form:
-                    error_result = self._classify_error(page_text, current_url)
+                    error_result = self._classify_error(combined_text, current_url)
                     await self.parent._save_screenshot(page, error_result.screenshot_tag)
                     logger.error("登录失败: %s (关键词匹配)", error_result.reason)
+                    if not error_result.reason or error_result.status == LoginStatus.UNKNOWN:
+                        # 将抓取到的部分文本也记录到 reason
+                        preview = (combined_text or "")[:200].replace("\n", " ")
+                        logger.error("页面文本预览: %s", preview)
+                        error_result = LoginResult(
+                            status=LoginStatus.UNKNOWN,
+                            reason=f"登录失败，原因未知。页面提示: {preview[:80] or '(空)'}",
+                            screenshot_tag="login_unknown",
+                        )
                     return error_result
 
-            await asyncio.sleep(3)
+            await asyncio.sleep(2)
 
         # 超时未检测到成功迹象
         await self.parent._save_screenshot(page, "login_unknown")
+        preview = (immediate_text or "")[:200].replace("\n", " ")
         return LoginResult(
             status=LoginStatus.UNKNOWN,
-            reason="登录超时，未检测到成功迹象（Epic 登录页可能改版）",
+            reason=f"登录超时，Epic 未跳转。页面提示: {preview[:80] or '(空)'}",
             screenshot_tag="login_unknown",
         )
