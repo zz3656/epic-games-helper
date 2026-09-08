@@ -1,7 +1,10 @@
 """FastAPI 主入口"""
+import asyncio
 import logging
 import os
+import uuid
 from contextlib import asynccontextmanager
+from typing import Any, Dict, Optional
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -62,6 +65,24 @@ app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), na
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
 
+# ============== 进度追踪 ==============
+claim_progress: Dict[str, Dict[str, Any]] = {}
+claim_results: Dict[str, Dict[str, Any]] = {}  # 存储完整结果，供进度查询时附加
+
+
+def track_progress(claim_id: str, step: str, status: str, extra: Optional[Dict] = None):
+    """记录领取进度（供前端轮询）"""
+    entry = {"claim_id": claim_id, "step": step, "status": status}
+    if extra:
+        entry.update(extra)
+    claim_progress[claim_id] = entry
+
+
+def store_result(claim_id: str, result_dict: Dict[str, Any]):
+    """存储完整领取结果"""
+    claim_results[claim_id] = result_dict
+
+
 # ============== 数据模型 ==============
 class Credentials(BaseModel):
     username: str = Field(..., min_length=1, max_length=200)
@@ -114,18 +135,73 @@ async def health():
     }
 
 
+async def _progress_callback(claim_id: str, step: str, status: str):
+    """进度回调：桥接 claimer → claim_progress"""
+    track_progress(claim_id, step, status)
+
+
 @app.post("/api/claim")
 async def claim_now(creds: Credentials):
     """立即触发一次领取（密码仅在请求作用域内）"""
-    logger.info("收到领取请求，用户: %s", _mask(creds.username))
-    try:
-        result = await scheduler.run_now(creds.username, creds.password)
-        return JSONResponse(content=_result_to_dict(result))
-    except Exception as e:
-        logger.exception("领取请求处理失败")
-        raise HTTPException(status_code=500, detail=f"服务器错误: {e}")
-    finally:
-        creds.password = None  # noqa: F841
+    claim_id = str(uuid.uuid4())
+    logger.info("收到领取请求，用户: %s (claim_id=%s)", _mask(creds.username), claim_id)
+
+    async def _do_claim():
+        # 设置进度回调桥接
+        scheduler._on_progress = lambda step, status: track_progress(claim_id, step, status)
+        try:
+            result = await scheduler.run_now(creds.username, creds.password)
+            result_dict = _result_to_dict(result)
+            store_result(claim_id, result_dict)
+            track_progress(claim_id, f"领取完成: {'成功' if result.success else '失败'}", "done")
+            return result
+        except Exception as e:
+            track_progress(claim_id, f"异常: {e}", "done")
+            raise
+        finally:
+            creds.password = None  # noqa: F841
+            # 清理回调
+            scheduler._on_progress = None
+
+    # 后台执行领取，立即返回 claim_id
+    asyncio.create_task(_do_claim())
+    return JSONResponse(content={"claim_id": claim_id, "message": "领取任务已启动"})
+
+
+@app.get("/api/claim/progress/{claim_id}")
+async def claim_progress_endpoint(claim_id: str):
+    """查询领取进度（轮询接口）"""
+    progress = claim_progress.get(claim_id)
+    if not progress:
+        # 检查是否已有结果
+        result_dict = claim_results.get(claim_id)
+        if result_dict:
+            claim_results.pop(claim_id, None)
+            return JSONResponse(content={"claim_id": claim_id, "step": "领取完成", "status": "done",
+                                        "result": result_dict})
+        raise HTTPException(status_code=404, detail="任务不存在或已过期")
+    # 如果进度已完成，附加完整结果
+    if progress.get("status") == "done":
+        result_dict = claim_results.get(claim_id)
+        if result_dict:
+            progress["result"] = result_dict
+        claim_progress.pop(claim_id, None)
+        if result_dict:
+            claim_results.pop(claim_id, None)
+    return JSONResponse(content=progress)
+
+
+@app.get("/api/claim/progress/{claim_id}")
+async def claim_progress_endpoint(claim_id: str):
+    """查询领取进度（轮询接口）"""
+    progress = claim_progress.get(claim_id)
+    if not progress:
+        raise HTTPException(status_code=404, detail="任务不存在或已过期")
+    # 如果进度已完成，附加完整结果
+    if progress.get("status") == "done":
+        # 清理旧进度
+        claim_progress.pop(claim_id, None)
+    return JSONResponse(content=progress)
 
 
 # ----- 凭证管理 -----

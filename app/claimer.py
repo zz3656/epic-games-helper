@@ -9,11 +9,12 @@ Epic Games 自动领取核心逻辑（主入口、登录、工具方法）
 - 不写入任何持久化存储
 - 不打印/记录完整密码
 """
+import asyncio
 import logging
 import os
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Callable, Coroutine, List, Optional
 
 from playwright.async_api import (
     async_playwright, Browser, BrowserContext, Page,
@@ -42,6 +43,16 @@ class ClaimResult:
     started_at: str = ""
     finished_at: str = ""
     screenshot_path: Optional[str] = None
+
+
+async def _emit(callback, step: str, status: str):
+    """异步调用进度回调"""
+    try:
+        coro = callback(step, status)
+        if asyncio.iscoroutine(coro):
+            await coro
+    except Exception:
+        pass  # 进度回调失败不应影响主流程
 
 
 def _mask_username(username: str) -> str:
@@ -104,14 +115,27 @@ class EpicClaimer:
     ]
     ALREADY_OWNED_TEXT = ["已在库中", "Owned", "已拥有", "In Library"]
 
-    def __init__(self, headless: bool = True, screenshot_dir: str = "/app/screenshots"):
+    def __init__(self, headless: bool = True, screenshot_dir: str = "/app/screenshots",
+                 on_progress: Optional[Callable] = None):
         self.headless = headless
         self.screenshot_dir = screenshot_dir
         self._playwright = None
         self._browser: Optional[Browser] = None
+        # 进度回调: callable(claim_id, step, status)
+        self._on_progress = on_progress
         # 关键：把账号密码以局部变量保存，with 块结束时立即清空
         self._username: Optional[str] = None
         self._password: Optional[str] = None
+
+    def _emit_progress(self, step: str, status: str):
+        """发出进度事件（异步，不阻塞主流程）"""
+        if self._on_progress:
+            try:
+                coro = self._on_progress(step, status)
+                if asyncio.iscoroutine(coro):
+                    asyncio.create_task(coro)
+            except Exception:
+                pass  # 进度回调失败不应影响主流程
 
     async def __aenter__(self):
         await self.start()
@@ -147,8 +171,15 @@ class EpicClaimer:
             except Exception as e:
                 logger.warning("Error stopping playwright: %s", e)
 
-    async def run(self, username: str, password: str) -> ClaimResult:
-        """主入口：登录 -> 抓取免费游戏 -> 逐个领取"""
+    async def run(self, username: str, password: str,
+                  on_progress: Optional[Callable] = None) -> ClaimResult:
+        """主入口：登录 -> 抓取免费游戏 -> 逐个领取
+        
+        Args:
+            username: 账号
+            password: 密码
+            on_progress: 进度回调 (step, status) -> None/Coroutine
+        """
         started = datetime.now().isoformat(timespec="seconds")
         result = ClaimResult(
             success=False,
@@ -159,6 +190,8 @@ class EpicClaimer:
         # 仅在内存中保存
         self._username = username
         self._password = password
+        # 优先使用传入的回调
+        progress_fn = on_progress or self._on_progress
 
         if not username or not password:
             result.error = "账号或密码不能为空"
@@ -166,6 +199,9 @@ class EpicClaimer:
 
         context: Optional[BrowserContext] = None
         try:
+            if progress_fn:
+                await _emit(progress_fn, "正在启动浏览器…", "active")
+
             context = await self._browser.new_context(
                 viewport={"width": 1440, "height": 900},
                 user_agent=(
@@ -178,17 +214,25 @@ class EpicClaimer:
             page = await context.new_page()
 
             # 1) 登录
-            logger.info("[%s] 开始登录流程", result.username)
+            if progress_fn:
+                await _emit(progress_fn, "正在登录…", "active")
             login_ok = await self._login(page)
             if not login_ok:
                 result.error = "登录失败：可能账号密码错误，或 Epic 登录页结构变化"
                 result.screenshot_path = await self._save_screenshot(page, "login_failed")
+                if progress_fn:
+                    await _emit(progress_fn, "登录失败", "done")
                 return result
+            if progress_fn:
+                await _emit(progress_fn, "登录成功", "done")
             logger.info("[%s] 登录成功", result.username)
 
             # 2) 抓取免费游戏列表
-            logger.info("[%s] 正在抓取免费游戏列表", result.username)
+            if progress_fn:
+                await _emit(progress_fn, "正在获取免费游戏列表…", "active")
             games = await fetch_free_games(self, page)
+            if progress_fn:
+                await _emit(progress_fn, f"发现 {len(games)} 款免费游戏", "done")
             logger.info("[%s] 发现 %d 款免费游戏", result.username, len(games))
             result.games = games
 
@@ -198,9 +242,18 @@ class EpicClaimer:
                 return result
 
             # 3) 逐个领取
-            for game in games:
+            for i, game in enumerate(games, 1):
+                if progress_fn:
+                    await _emit(progress_fn, f"正在领取 [{i}/{len(games)}]: {game.title}", "active")
                 logger.info("[%s] 正在领取: %s", result.username, game.title)
                 game.status, game.message = await claim_one(self, page, game.url)
+                status_icon = "✅" if game.status in ("claimed", "already_claimed") else "❌"
+                if progress_fn:
+                    await _emit(
+                        progress_fn,
+                        f"{status_icon} {game.title}: {game.message}",
+                        "done",
+                    )
                 logger.info(
                     "[%s] %s -> %s (%s)",
                     result.username, game.title, game.status, game.message,
@@ -217,6 +270,8 @@ class EpicClaimer:
                 page = context.pages[0] if context.pages else None
                 if page:
                     result.screenshot_path = await self._save_screenshot(page, "exception")
+            if progress_fn:
+                await _emit(progress_fn, f"异常: {e}", "done")
         finally:
             # 关键：关闭 context，确保 cookie/会话也被丢弃
             if context:

@@ -2,7 +2,7 @@
 import asyncio
 import logging
 from datetime import datetime
-from typing import Optional
+from typing import Any, Callable, Optional
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -13,6 +13,9 @@ from app.credential_store import CredentialStore, StoredCredential
 from app.storage import ResultStore
 
 logger = logging.getLogger(__name__)
+
+# 全局进度回调（供手动触发时传递）
+_progress_callbacks: dict[str, Callable] = {}
 
 
 class ClaimScheduler:
@@ -32,6 +35,7 @@ class ClaimScheduler:
         self.scheduler = AsyncIOScheduler(timezone=config.timezone)
         self._lock = asyncio.Lock()
         self._last_result: Optional[ClaimResult] = None
+        self._on_progress: Optional[Callable] = None
 
     def start(self):
         day = DAY_MAP.get(self.config.schedule_day, "thu")
@@ -68,7 +72,7 @@ class ClaimScheduler:
             self.scheduler.shutdown(wait=False)
             logger.info("调度器已关闭")
 
-    async def run_now(self, username: str, password: str) -> ClaimResult:
+    async def run_now(self, username: str, password: str, on_progress: Optional[Callable] = None) -> ClaimResult:
         """手动触发一次领取"""
         if self._lock.locked():
             return ClaimResult(
@@ -76,6 +80,7 @@ class ClaimScheduler:
                 error="已有任务正在执行，请稍后再试",
                 started_at=datetime.now().isoformat(timespec="seconds"),
             )
+        self._on_progress = on_progress
         async with self._lock:
             result = await self._execute(username, password)
             self._last_result = result
@@ -113,23 +118,31 @@ class ClaimScheduler:
     async def _execute(self, username: str, password: str) -> ClaimResult:
         """实际执行领取流程"""
         logger.info("执行领取任务，用户: %s", _mask(username))
+        started = datetime.now().isoformat(timespec="seconds")
+        result = ClaimResult(
+            success=False,
+            username=_mask(username),
+            started_at=started,
+        )
         try:
             async with EpicClaimer(
                 headless=self.config.headless,
                 screenshot_dir="/app/screenshots",
+                on_progress=self._on_progress,
             ) as claimer:
                 result = await claimer.run(username, password)
-                logger.info(
-                    "任务完成: success=%s, games=%d, error=%s",
-                    result.success, len(result.games), result.error,
-                )
-                return result
+
+            logger.info(
+                "任务完成: success=%s, games=%d, error=%s",
+                result.success, len(result.games), result.error,
+            )
+            return result
         except Exception as e:
             logger.exception("任务执行异常")
             return ClaimResult(
                 success=False, username=_mask(username),
                 error=f"执行异常: {type(e).__name__}: {e}",
-                started_at=datetime.now().isoformat(timespec="seconds"),
+                started_at=started,
                 finished_at=datetime.now().isoformat(timespec="seconds"),
             )
         finally:

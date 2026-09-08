@@ -27,19 +27,34 @@ const btnText = submitBtn.querySelector(".btn-text");
 const btnSpinner = submitBtn.querySelector(".btn-spinner");
 const resultBox = document.getElementById("result");
 
+let currentClaimId = null;
+let pollTimer = null;
+
 form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const username = document.getElementById("username").value.trim();
     const password = document.getElementById("password").value;
     if (!username || !password) {
-        showResult(resultBox, { success: false, error: "请输入账号和密码" });
+        showClaimResult(resultBox, { success: false, error: "请输入账号和密码" });
         return;
     }
 
     submitBtn.disabled = true;
     btnText.hidden = true;
     btnSpinner.hidden = false;
-    resultBox.hidden = true;
+
+    // 生成一个唯一的 claimId 用于轮询进度
+    currentClaimId = null;
+    resultBox.hidden = false;
+    resultBox.className = "result progress";
+    resultBox.innerHTML = `
+        <div class="progress-steps">
+            <div class="step-item active">
+                <span class="step-icon">⏳</span>
+                <span class="step-text">正在提交请求…</span>
+            </div>
+        </div>
+    `;
 
     try {
         const resp = await fetch("/api/claim", {
@@ -48,49 +63,101 @@ form.addEventListener("submit", async (e) => {
             body: JSON.stringify({ username, password }),
         });
         const data = await resp.json();
-        showResult(resultBox, data);
-        document.getElementById("password").value = "";
+
+        if (!resp.ok) {
+            showClaimResult(resultBox, { success: false, error: data.detail || "请求失败" });
+            submitBtn.disabled = false;
+            btnText.hidden = false;
+            btnSpinner.hidden = true;
+            return;
+        }
+
+        currentClaimId = data.claim_id;
+
+        // 开始轮询进度
+        pollProgress(currentClaimId);
     } catch (err) {
-        showResult(resultBox, { success: false, error: `网络错误: ${err.message}` });
-    } finally {
+        showClaimResult(resultBox, { success: false, error: `网络错误: ${err.message}` });
         submitBtn.disabled = false;
         btnText.hidden = false;
         btnSpinner.hidden = true;
-        loadHistory();
     }
 });
 
-function showResult(box, data) {
-    box.hidden = false;
-    const cls = data.success ? "success" : "error";
-    box.className = `result ${cls}`;
-    let html = `<div><strong>${data.success ? "✅ 任务完成" : "❌ 任务失败"}</strong>`;
-    if (data.error) html += `<div style="margin-top:6px;">${escapeHtml(data.error)}</div>`;
-    if (data.started_at) {
-        html += `<div style="margin-top:6px; font-size:11px; opacity:0.7;">
-                    开始: ${data.started_at} | 结束: ${data.finished_at || "-"}
-                 </div>`;
+// 轮询进度
+function pollProgress(claimId) {
+    // 清除之前的定时器
+    if (pollTimer) {
+        clearTimeout(pollTimer);
     }
-    if (data.games && data.games.length > 0) {
-        html += `<div class="games-list">`;
-        for (const g of data.games) {
-            const statusMap = {
-                claimed: { cls: "claimed", text: "已领取" },
-                already_claimed: { cls: "already", text: "已拥有" },
-                failed: { cls: "failed", text: "失败" },
-                not_free: { cls: "not_free", text: "非免费" },
-                pending: { cls: "pending", text: "等待中" },
-            };
-            const s = statusMap[g.status] || { cls: "pending", text: g.status };
-            html += `<div class="game-item">
-                        <span class="title">${escapeHtml(g.title)}</span>
-                        <span class="badge ${s.cls}">${s.text}</span>
-                     </div>`;
-        }
-        html += `</div>`;
+
+    function doPoll() {
+        fetch(`/api/claim/progress/${claimId}`)
+            .then(resp => {
+                if (!resp.ok) {
+                    if (resp.status === 404) {
+                        // 任务已完成并清理，尝试获取缓存结果
+                        return fetch(`/api/history/latest`);
+                    }
+                    throw new Error(`HTTP ${resp.status}`);
+                }
+                return resp.json();
+            })
+            .then(data => {
+                // 检查是否包含完整结果
+                if (data.result) {
+                    // 清理
+                    if (pollTimer) {
+                        clearTimeout(pollTimer);
+                        pollTimer = null;
+                    }
+                    showClaimResult(resultBox, data.result);
+                    submitBtn.disabled = false;
+                    btnText.hidden = false;
+                    btnSpinner.hidden = true;
+                    document.getElementById("password").value = "";
+                    loadHistory();
+                    return;
+                }
+
+                // 只有进度信息，继续轮询
+                if (data.status === "done") {
+                    // 已完成但没有完整结果，再等一次
+                    pollTimer = setTimeout(doPoll, 1000);
+                    return;
+                }
+
+                // 更新进度显示
+                updateProgressBox(resultBox, data);
+                pollTimer = setTimeout(doPoll, 1500);
+            })
+            .catch(err => {
+                // 轮询出错（可能是404任务已完成），尝试直接获取结果
+                if (pollTimer) {
+                    clearTimeout(pollTimer);
+                    pollTimer = null;
+                }
+                // 如果还没有显示结果，说明任务可能出错了
+                // 不立即显示错误，让用户看到最后的进度
+                console.warn("轮询进度出错:", err);
+            });
     }
-    html += `</div>`;
-    box.innerHTML = html;
+
+    // 首次轮询延迟 1 秒
+    pollTimer = setTimeout(doPoll, 1000);
+}
+
+function updateProgressBox(container, data) {
+    container.className = "result progress";
+    container.innerHTML = `
+        <div class="progress-steps">
+            <div class="step-item active">
+                <span class="step-icon">⏳</span>
+                <span class="step-text">${escapeHtml(data.step || "处理中…")}</span>
+            </div>
+        </div>
+    `;
+    container.hidden = false;
 }
 
 // ============ 模式 2：保存凭证 + 自动领取 ============
@@ -112,7 +179,7 @@ saveForm.addEventListener("submit", async (e) => {
     const enableAuto = document.getElementById("enable-auto").checked;
 
     if (!username || !password) {
-        showResult(saveResult, { success: false, error: "请输入账号和密码" });
+        showSaveResult(saveResult, { success: false, error: "请输入账号和密码" });
         return;
     }
 
@@ -129,19 +196,22 @@ saveForm.addEventListener("submit", async (e) => {
         });
         const data = await resp.json();
         if (resp.ok) {
-            showResult(saveResult, { success: true, error: null, finished_at: "✓ 凭证已加密保存" });
-            // 清空输入框
+            showSaveResult(saveResult, {
+                success: true,
+                message: "凭证已加密保存",
+                auto_claim_enabled: data.auto_claim_enabled,
+            });
             document.getElementById("save-password").value = "";
             await refreshStatus();
         } else {
-            showResult(saveResult, { success: false, error: data.detail || "保存失败" });
+            showSaveResult(saveResult, { success: false, error: data.detail || "保存失败" });
         }
     } catch (err) {
-        showResult(saveResult, { success: false, error: `网络错误: ${err.message}` });
+        showSaveResult(saveResult, { success: false, error: `网络错误: ${err.message}` });
     } finally {
         saveBtn.disabled = false;
         saveBtnText.hidden = false;
-        saveBtnSpinner.hidden = false;
+        saveBtnSpinner.hidden = true;
     }
 });
 
@@ -152,13 +222,13 @@ deleteBtn.addEventListener("click", async () => {
         const resp = await fetch("/api/credentials", { method: "DELETE" });
         const data = await resp.json();
         if (resp.ok) {
-            showResult(saveResult, { success: true, error: null, finished_at: "✓ 凭证已删除" });
+            showSaveResult(saveResult, { success: true, message: "凭证已删除" });
             await refreshStatus();
         } else {
-            showResult(saveResult, { success: false, error: data.detail || "删除失败" });
+            showSaveResult(saveResult, { success: false, error: data.detail || "删除失败" });
         }
     } catch (err) {
-        showResult(saveResult, { success: false, error: `网络错误: ${err.message}` });
+        showSaveResult(saveResult, { success: false, error: `网络错误: ${err.message}` });
     }
 });
 
@@ -175,7 +245,7 @@ autoSwitch.addEventListener("change", async () => {
         if (resp.ok) {
             updateAutoStatus(data.auto_claim_enabled);
         } else {
-            autoSwitch.checked = !enabled; // 回滚
+            autoSwitch.checked = !enabled;
             alert(data.detail || "操作失败");
         }
     } catch (err) {
@@ -238,6 +308,74 @@ async function loadHistory() {
         }).join("");
     } catch (err) {
         console.error("加载历史失败:", err);
+    }
+}
+
+// ============ 结果显示 ============
+function showClaimResult(box, data) {
+    box.hidden = false;
+
+    // 错误
+    if (data.error && (!data.success && !data.games)) {
+        box.className = "result error";
+        box.innerHTML = `
+            <div class="result-title"><strong>❌ 领取失败</strong></div>
+            <div class="result-error">${escapeHtml(data.error)}</div>
+            ${data.screenshot_path ? `<div class="result-hint">📸 截图: ${escapeHtml(data.screenshot_path)}</div>` : ''}
+        `;
+    } else {
+        // 成功（或有部分成功）
+        box.className = `result ${data.success ? "success" : "error"}`;
+        let html = `<div class="result-title"><strong>${data.success ? "✅ 任务完成" : "❌ 任务完成（有失败）"}</strong></div>`;
+
+        // 时间
+        if (data.started_at || data.finished_at) {
+            html += `<div class="result-time">
+                        开始: ${data.started_at || "-"} | 结束: ${data.finished_at || "-"}
+                     </div>`;
+        }
+
+        // 游戏列表
+        if (data.games && data.games.length > 0) {
+            html += `<div class="games-list">`;
+            for (const g of data.games) {
+                const statusMap = {
+                    claimed: { cls: "claimed", text: "✅ 已领取" },
+                    already_claimed: { cls: "already", text: "🔸 已拥有" },
+                    failed: { cls: "failed", text: "❌ 失败" },
+                    not_free: { cls: "not_free", text: "⚪ 非免费" },
+                    pending: { cls: "pending", text: "⏳ 等待中" },
+                };
+                const s = statusMap[g.status] || { cls: "pending", text: g.status };
+                html += `<div class="game-item">
+                            <span class="title">${escapeHtml(g.title)}</span>
+                            <div class="game-detail">
+                                <span class="badge ${s.cls}">${s.text}</span>
+                                ${g.message ? `<span class="game-msg">${escapeHtml(g.message)}</span>` : ''}
+                            </div>
+                         </div>`;
+            }
+            html += `</div>`;
+        }
+
+        // 截图
+        if (data.screenshot_path) {
+            html += `<div class="result-hint">📸 截图: ${escapeHtml(data.screenshot_path)}</div>`;
+        }
+
+        box.innerHTML = html;
+    }
+}
+
+function showSaveResult(box, data) {
+    box.hidden = false;
+    if (data.success) {
+        box.className = "result success";
+        box.innerHTML = `<div class="result-title"><strong>✅ ${escapeHtml(data.message)}</strong></div>
+            ${data.auto_claim_enabled !== undefined ? `<div class="result-time">自动领取: ${data.auto_claim_enabled ? "已启用" : "未启用"}</div>` : ''}`;
+    } else {
+        box.className = "result error";
+        box.innerHTML = `<div class="result-title"><strong>❌ ${escapeHtml(data.error)}</strong></div>`;
     }
 }
 
