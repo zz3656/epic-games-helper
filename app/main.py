@@ -361,7 +361,11 @@ async def get_screenshot(filename: str):
     # 安全检查：防止路径穿越
     if not os.path.exists(path) or ".." in filename or "/" in filename:
         raise HTTPException(status_code=404, detail="截图不存在")
-    return FileResponse(path)
+    # 明确设置 media_type 以便浏览器正确渲染
+    return FileResponse(path, media_type="image/png", headers={
+        "Cache-Control": "no-cache",
+        "Content-Disposition": f'inline; filename="{filename}"',
+    })
 
 
 @app.post("/api/auto-claim/toggle")

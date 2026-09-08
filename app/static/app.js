@@ -321,6 +321,7 @@ function bindScreenshotToggle(box) {
             const preview = box.querySelector(`div[data-preview-for="${filename}"]`);
             if (preview) {
                 preview.style.display = preview.style.display === 'none' ? 'block' : 'none';
+                a.textContent = preview.style.display === 'none' ? '[查看/隐藏]' : '[隐藏]';
             }
         });
     });
