@@ -151,34 +151,9 @@ class EpicClaimer:
                 "--disable-dev-shm-usage",
                 # 隐藏自动化特征
                 "--disable-features=IsolateOrigins,site-per-process",
-                # 使用真实的 UA
             ],
         )
-        # 注入 stealth 脚本：移除 webdriver 痕迹
-        await self._browser.context.add_init_script("""
-            // 隐藏 navigator.webdriver
-            Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-            // 伪装 chrome runtime
-            window.chrome = { runtime: {}, loadTimes: () => ({}), csi: () => ({}) };
-            // 隐藏 Playwright
-            delete window.__playwright;
-            delete window.__pwInitScripts;
-            // 伪装 plugins
-            Object.defineProperty(navigator, 'plugins', {
-                get: () => [1, 2, 3, 4, 5],
-            });
-            // 伪装 languages
-            Object.defineProperty(navigator, 'languages', {
-                get: () => ['zh-CN', 'zh', 'en-US', 'en'],
-            });
-            // 隐藏 permissions query
-            const originalQuery = window.navigator.permissions.query;
-            window.navigator.permissions.query = (parameters) =>
-                parameters.name === 'notifications' ?
-                Promise.resolve({ state: Notification.permission }) :
-                originalQuery(parameters);
-        """)
-        logger.info("Browser launched (headless=%s, stealth enabled)", self.headless)
+        logger.info("Browser launched (headless=%s)", self.headless)
 
     async def close(self):
         # 关键：清理敏感数据
@@ -237,6 +212,42 @@ class EpicClaimer:
                 ),
                 locale="zh-CN",
             )
+            # 注入 stealth 脚本：避免被 hCaptcha/Epic 检测为机器人
+            await context.add_init_script("""
+                // 隐藏 navigator.webdriver
+                Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+                // 伪装 chrome runtime
+                window.chrome = { runtime: {}, loadTimes: () => ({}), csi: () => ({}) };
+                // 删除 Playwright 注入的全局变量
+                try { delete window.__playwright; } catch (e) {}
+                try { delete window.__pwInitScripts; } catch (e) {}
+                try { delete window.__pwScripts; } catch (e) {}
+                // 伪装 plugins
+                Object.defineProperty(navigator, 'plugins', {
+                    get: () => [1, 2, 3, 4, 5],
+                });
+                // 伪装 languages
+                Object.defineProperty(navigator, 'languages', {
+                    get: () => ['zh-CN', 'zh', 'en-US', 'en'],
+                });
+                // 隐藏 permissions query
+                try {
+                    const originalQuery = window.navigator.permissions.query;
+                    window.navigator.permissions.query = (parameters) =>
+                        parameters.name === 'notifications' ?
+                        Promise.resolve({ state: Notification.permission }) :
+                        originalQuery(parameters);
+                } catch (e) {}
+                // 伪装 WebGL vendor/renderer
+                try {
+                    const getParameter = WebGLRenderingContext.prototype.getParameter;
+                    WebGLRenderingContext.prototype.getParameter = function(parameter) {
+                        if (parameter === 37445) return 'Intel Inc.';
+                        if (parameter === 37446) return 'Intel Iris OpenGL Engine';
+                        return getParameter.call(this, parameter);
+                    };
+                } catch (e) {}
+            """)
             page = await context.new_page()
 
             # 1) 登录（关键步骤：登录失败则终止后续领取）
