@@ -210,24 +210,29 @@ class EpicClaimer:
             )
             page = await context.new_page()
 
-            # 1) 登录
+            # 1) 登录（关键步骤：登录失败则终止后续领取）
             if progress_fn:
-                await _emit(progress_fn, "正在登录…", "active")
+                await _emit(progress_fn, "🔐 正在登录 Epic…", "active")
             login_status = await self._login_handler.login(page, verification_code)
+
             if login_status == "needs_verification":
-                result.error = "需要邮箱验证：Epic 要求邮箱验证码。请在 Web 界面输入验证码，或先在本地手动登录一次以信任本设备"
+                result.error = "需要邮箱验证：Epic 要求邮箱验证码。请检查邮箱获取验证码后重新提交，或在本地手动登录一次以信任本设备"
                 result.screenshot_path = await self._save_screenshot(page, "verification_required")
                 if progress_fn:
-                    await _emit(progress_fn, "需要邮箱验证", "done")
+                    await _emit(progress_fn, "🔐 需要邮箱验证", "done")
                 return result
+
             if login_status != "success":
-                result.error = "登录失败：账号密码错误，或 Epic 登录页结构变化"
+                # 登录失败 -> 硬终止，后续步骤不执行
+                result.error = "登录失败：账号或密码错误，或 Epic 登录页结构变化。后续领取已取消，请检查账号密码后重试"
                 result.screenshot_path = await self._save_screenshot(page, "login_failed")
                 if progress_fn:
-                    await _emit(progress_fn, "登录失败", "done")
+                    await _emit(progress_fn, "🔒 登录失败，已取消领取", "done")
+                logger.error("[%s] 登录失败，终止后续流程", result.username)
                 return result
+
             if progress_fn:
-                await _emit(progress_fn, "登录成功", "done")
+                await _emit(progress_fn, "✅ 登录成功", "done")
             logger.info("[%s] 登录成功", result.username)
 
             # 2) 抓取免费游戏列表

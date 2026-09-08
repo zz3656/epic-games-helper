@@ -147,16 +147,16 @@ class LoginHandler:
         # 2. 停留在登录页，出现错误提示 -> 登录失败
         # 3. 跳转到验证页面，需要输入邮箱验证码 -> needs_verification
         # 4. 什么都没发生（超时）-> 登录失败
-        for _ in range(3):
+        for attempt_idx in range(3):
             try:
                 await page.wait_for_url(
                     lambda url: (
                         "store.epicgames.com" in url
                         or "epicgames.com/account" in url
-                        or "id.epicgames.com" not in url
                     ),
                     timeout=15000,
                 )
+                logger.info("登录成功（URL 跳转）")
                 return "success"
             except PWTimeout:
                 pass
@@ -166,32 +166,58 @@ class LoginHandler:
                 await page.wait_for_selector(
                     '[data-testid="user-accountexposed"]', timeout=3000
                 )
+                logger.info("登录成功（账号菜单）")
                 return "success"
             except PWTimeout:
                 pass
 
-            # 检查是否需要邮箱验证
+            # 获取当前 URL 和页面文本
+            current_url = page.url
             page_text = await self.parent._get_page_text(page)
+
+            # 检查是否需要邮箱验证
             for prompt in self.VERIFICATION_PROMPT_TEXTS:
                 if prompt in page_text:
                     logger.warning("检测到邮箱验证: %s", prompt)
                     await self.parent._save_screenshot(page, "verification_required")
                     return "needs_verification"
 
-            # 检查是否有错误提示
-            err = await self.parent._get_text_safe(
+            # 检查错误提示（多种选择器 + 关键文字）
+            error_text = await self.parent._get_text_safe(
                 target,
                 '[role="alert"], .error, [data-testid="error"], '
                 '[data-testid="login-error"], [class*="ErrorMessage"], '
-                '[class*="error"]',
+                '[class*="error"], [class*="Error"], [aria-live="assertive"]',
             )
-            if err:
-                logger.error("登录错误提示: %s", err)
+            # 显式的错误关键词（Epic 错误提示中常见）
+            error_keywords = [
+                "密码错误", "不正确", "invalid", "incorrect", "wrong",
+                "无法登录", "登录失败", "Unable", "try again",
+                "doesn't match", "do not match", "not recognized",
+            ]
+            has_error = error_text and any(kw in error_text for kw in error_keywords)
+            if error_text and has_error:
+                logger.error("登录错误提示: %s", error_text)
+                await self.parent._save_screenshot(page, "login_failed")
                 return "failed"
+
+            # 如果 URL 还停留在 id.epicgames.com/login 且多次轮询后仍未跳转，视为登录失败
+            if "id.epicgames.com" in current_url and attempt_idx >= 1:
+                logger.warning("URL 仍停留在登录页 (尝试 %d): %s", attempt_idx + 1, current_url)
+                # 检查页面是否仍然包含登录表单（说明未跳转，未登录成功）
+                still_has_form = await page.evaluate("""
+                () => {
+                    return !!document.querySelector('input[type="password"], input[name="password"]');
+                }
+                """)
+                if still_has_form:
+                    logger.error("登录未跳转且仍存在密码输入框，判定为登录失败")
+                    await self.parent._save_screenshot(page, "login_failed")
+                    return "failed"
 
             # 兜底：等待再试
             await asyncio.sleep(3)
 
-        logger.error("登录超时")
+        logger.error("登录超时（多轮轮询未检测到成功迹象）")
         await self.parent._save_screenshot(page, "login_unknown")
         return "failed"
