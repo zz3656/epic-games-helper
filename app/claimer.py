@@ -336,13 +336,12 @@ class EpicClaimer:
         # 等待登录完成：跳转到 store 或账号中心
         try:
             await page.wait_for_url(
-                lambda url: ("store.epicgames.com" in url or "epicgames.com/account" in url
-                             or "id.epicgames.com" not in url),
+                lambda url: ("store.epicgames.com" in url or "epicgames.com/account" in url),
                 timeout=30000,
             )
             return True
         except PWTimeout:
-            # 兜底：再等几秒，看是否出现账号菜单
+            # 检查是否出现账号菜单（某些场景下 URL 不变）
             try:
                 await page.wait_for_selector(
                     '[data-testid="user-accountexposed"]', timeout=8000
@@ -350,9 +349,17 @@ class EpicClaimer:
                 return True
             except PWTimeout:
                 # 检查是否有错误提示
-                err = await self._get_text_safe(target, '[role="alert"], .error, [data-testid="error"]')
+                err = await self._get_text_safe(
+                    target,
+                    '[role="alert"], .error, [data-testid="error"], '
+                    '[data-testid="login-error"], [class*="ErrorMessage"], '
+                    '[class*="error"]',
+                )
                 if err:
                     logger.error("登录错误提示: %s", err)
+                    return False
+                # 未检测到成功迹象，视为登录失败
+                logger.error("登录超时，未跳转到首页且未检测到账号菜单")
                 return False
 
     # ============== 工具方法 ==============

@@ -482,6 +482,7 @@ code {
 .badge.already       { background: #0891b2; color: #fff; }
 .badge.failed        { background: #dc2626; color: #fff; }
 .badge.not_free      { background: #6b7280; color: #fff; }
+.badge.not_started   { background: #a855f7; color: #fff; }
 .badge.pending       { background: #f59e0b; color: #fff; }
 
 /* History */

@@ -283,6 +283,9 @@ def _result_to_dict(result) -> dict:
         "started_at": result.started_at,
         "finished_at": result.finished_at,
         "screenshot_path": result.screenshot_path,
+        "login_failed": result.success is False and result.games == [] and (
+            result.error or ""
+        ).startswith("登录失败"),
         "games": [
             {
                 "title": g.title, "url": g.url,

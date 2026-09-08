@@ -7,6 +7,7 @@ Epic Games 游戏抓取与领取逻辑（从 claimer.py 拆出，控制单文件
 """
 import asyncio
 import logging
+import re
 from typing import TYPE_CHECKING, List
 
 from playwright.async_api import Page, TimeoutError as PWTimeout
@@ -15,6 +16,19 @@ if TYPE_CHECKING:
     from app.claimer import EpicClaimer
 
 logger = logging.getLogger(__name__)
+
+
+def _is_coming_soon(page_text: str) -> bool:
+    """检测页面是否包含“即将推出 / 还未到免费领取时间”"""
+    # 明确状态词
+    coming_soon_keywords = ["即将推出", "Coming Soon", "Upcoming", "Free on", "免费于", "将在"]
+    for kw in coming_soon_keywords:
+        if kw in page_text:
+            return True
+    # 包含日期格式：9月10日 - 9月17日 / 9月10日 23:00 / Sep 10 - Sep 17
+    if re.search(r'\d{1,2}月\d{1,2}日\s*[-~]', page_text):
+        return True
+    return False
 
 
 async def fetch_free_games(claimer: "EpicClaimer", page: Page) -> List:
@@ -40,7 +54,7 @@ async def fetch_free_games(claimer: "EpicClaimer", page: Page) -> List:
     () => {
         const results = [];
 
-        // 查找首页推荐轮播中带有"免费"标签的游戏卡片
+        // 查找首页推荐轮播中带有“免费”标签的游戏卡片
         const selectors = [
             // data-path 属性指向游戏页的卡片
             '[data-path*="/p/"]',
@@ -61,8 +75,11 @@ async def fetch_free_games(claimer: "EpicClaimer", page: Page) -> List:
                 const ariaLabel = (a.getAttribute('aria-label') || '').trim();
                 const combined = text + ' ' + ariaLabel;
 
-                // 只保留带有"免费"标识的
-                if (/免费|Free|NOW FREE|免费下载/i.test(combined)) {
+                // 只保留当前可领取的（"免费"且未"即将推出/Coming Soon"）
+                const isFree = /免费|Free|免费下载/i.test(combined);
+                const isComingSoon = /即将推出|Coming Soon|Upcoming/i.test(combined);
+
+                if (isFree && !isComingSoon) {
                     const title = ariaLabel ||
                         a.querySelector('[class*="Title"]')?.innerText?.trim() ||
                         a.querySelector('[class*="Title"]')?.textContent?.trim() ||
@@ -110,6 +127,10 @@ async def claim_one(claimer: "EpicClaimer", page: Page, url: str) -> tuple:
     for owned in claimer.ALREADY_OWNED_TEXT:
         if owned in page_text:
             return ("already_claimed", f"已拥有: {owned}")
+
+    # 检查是否未开始（即将推出）
+    if _is_coming_soon(page_text):
+        return ("not_started", "游戏还未免费，暂不领取")
 
     # 点击获取按钮
     clicked = await claimer._click_first_available(page, claimer.GET_BUTTON_SELECTORS)

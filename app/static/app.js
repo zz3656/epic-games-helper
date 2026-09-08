@@ -43,7 +43,6 @@ form.addEventListener("submit", async (e) => {
     btnText.hidden = true;
     btnSpinner.hidden = false;
 
-    // 生成一个唯一的 claimId 用于轮询进度
     currentClaimId = null;
     resultBox.hidden = false;
     resultBox.className = "result progress";
@@ -73,8 +72,6 @@ form.addEventListener("submit", async (e) => {
         }
 
         currentClaimId = data.claim_id;
-
-        // 开始轮询进度
         pollProgress(currentClaimId);
     } catch (err) {
         showClaimResult(resultBox, { success: false, error: `网络错误: ${err.message}` });
@@ -84,33 +81,21 @@ form.addEventListener("submit", async (e) => {
     }
 });
 
-// 轮询进度
 function pollProgress(claimId) {
-    // 清除之前的定时器
-    if (pollTimer) {
-        clearTimeout(pollTimer);
-    }
+    if (pollTimer) clearTimeout(pollTimer);
 
     function doPoll() {
         fetch(`/api/claim/progress/${claimId}`)
             .then(resp => {
                 if (!resp.ok) {
-                    if (resp.status === 404) {
-                        // 任务已完成并清理，尝试获取缓存结果
-                        return fetch(`/api/history/latest`);
-                    }
+                    if (resp.status === 404) return fetch(`/api/history/latest`);
                     throw new Error(`HTTP ${resp.status}`);
                 }
                 return resp.json();
             })
             .then(data => {
-                // 检查是否包含完整结果
                 if (data.result) {
-                    // 清理
-                    if (pollTimer) {
-                        clearTimeout(pollTimer);
-                        pollTimer = null;
-                    }
+                    if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
                     showClaimResult(resultBox, data.result);
                     submitBtn.disabled = false;
                     btnText.hidden = false;
@@ -119,31 +104,19 @@ function pollProgress(claimId) {
                     loadHistory();
                     return;
                 }
-
-                // 只有进度信息，继续轮询
                 if (data.status === "done") {
-                    // 已完成但没有完整结果，再等一次
                     pollTimer = setTimeout(doPoll, 1000);
                     return;
                 }
-
-                // 更新进度显示
                 updateProgressBox(resultBox, data);
                 pollTimer = setTimeout(doPoll, 1500);
             })
             .catch(err => {
-                // 轮询出错（可能是404任务已完成），尝试直接获取结果
-                if (pollTimer) {
-                    clearTimeout(pollTimer);
-                    pollTimer = null;
-                }
-                // 如果还没有显示结果，说明任务可能出错了
-                // 不立即显示错误，让用户看到最后的进度
+                if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
                 console.warn("轮询进度出错:", err);
             });
     }
 
-    // 首次轮询延迟 1 秒
     pollTimer = setTimeout(doPoll, 1000);
 }
 
@@ -315,56 +288,74 @@ async function loadHistory() {
 function showClaimResult(box, data) {
     box.hidden = false;
 
-    // 错误
-    if (data.error && (!data.success && !data.games)) {
+    // 登录失败
+    if (data.login_failed) {
+        box.className = "result error";
+        box.innerHTML = `
+            <div class="result-title"><strong>🔒 登录失败</strong></div>
+            <div class="result-error">${escapeHtml(data.error || "")}</div>
+            <div class="result-hint" style="margin-top:10px;">
+                💡 请检查：<br>
+                • Epic 账号密码是否正确<br>
+                • 是否开启了双因素认证<br>
+                • Epic 是否要求验证码（需手动登录一次）
+            </div>
+            ${data.screenshot_path ? `<div class="result-hint">📸 截图: ${escapeHtml(data.screenshot_path)}</div>` : ''}
+        `;
+        return;
+    }
+
+    // 其他错误（无游戏列表）
+    if (data.error && (!data.success && (!data.games || data.games.length === 0))) {
         box.className = "result error";
         box.innerHTML = `
             <div class="result-title"><strong>❌ 领取失败</strong></div>
             <div class="result-error">${escapeHtml(data.error)}</div>
             ${data.screenshot_path ? `<div class="result-hint">📸 截图: ${escapeHtml(data.screenshot_path)}</div>` : ''}
         `;
-    } else {
-        // 成功（或有部分成功）
-        box.className = `result ${data.success ? "success" : "error"}`;
-        let html = `<div class="result-title"><strong>${data.success ? "✅ 任务完成" : "❌ 任务完成（有失败）"}</strong></div>`;
+        return;
+    }
 
-        // 时间
-        if (data.started_at || data.finished_at) {
-            html += `<div class="result-time">
-                        开始: ${data.started_at || "-"} | 结束: ${data.finished_at || "-"}
+    // 成功（或有部分失败）
+    box.className = `result ${data.success ? "success" : "error"}`;
+    let html = `<div class="result-title"><strong>${data.success ? "✅ 任务完成" : "⚠️ 任务完成（有失败）"}</strong></div>`;
+
+    if (data.started_at || data.finished_at) {
+        html += `<div class="result-time">
+                    开始: ${data.started_at || "-"} | 结束: ${data.finished_at || "-"}
+                 </div>`;
+    }
+
+    if (data.games && data.games.length > 0) {
+        html += `<div class="games-list">`;
+        for (const g of data.games) {
+            const statusMap = {
+                claimed: { cls: "claimed", text: "✅ 已领取" },
+                already_claimed: { cls: "already", text: "🔸 已拥有" },
+                failed: { cls: "failed", text: "❌ 失败" },
+                not_free: { cls: "not_free", text: "⚪ 非免费" },
+                not_started: { cls: "not_started", text: "⏳ 未开始免费" },
+                pending: { cls: "pending", text: "⏳ 等待中" },
+            };
+            const s = statusMap[g.status] || { cls: "pending", text: g.status };
+            html += `<div class="game-item">
+                        <span class="title">${escapeHtml(g.title)}</span>
+                        <div class="game-detail">
+                            <span class="badge ${s.cls}">${s.text}</span>
+                            ${g.message ? `<span class="game-msg">${escapeHtml(g.message)}</span>` : ''}
+                        </div>
                      </div>`;
         }
-
-        // 游戏列表
-        if (data.games && data.games.length > 0) {
-            html += `<div class="games-list">`;
-            for (const g of data.games) {
-                const statusMap = {
-                    claimed: { cls: "claimed", text: "✅ 已领取" },
-                    already_claimed: { cls: "already", text: "🔸 已拥有" },
-                    failed: { cls: "failed", text: "❌ 失败" },
-                    not_free: { cls: "not_free", text: "⚪ 非免费" },
-                    pending: { cls: "pending", text: "⏳ 等待中" },
-                };
-                const s = statusMap[g.status] || { cls: "pending", text: g.status };
-                html += `<div class="game-item">
-                            <span class="title">${escapeHtml(g.title)}</span>
-                            <div class="game-detail">
-                                <span class="badge ${s.cls}">${s.text}</span>
-                                ${g.message ? `<span class="game-msg">${escapeHtml(g.message)}</span>` : ''}
-                            </div>
-                         </div>`;
-            }
-            html += `</div>`;
-        }
-
-        // 截图
-        if (data.screenshot_path) {
-            html += `<div class="result-hint">📸 截图: ${escapeHtml(data.screenshot_path)}</div>`;
-        }
-
-        box.innerHTML = html;
+        html += `</div>`;
+    } else {
+        html += `<div class="result-hint" style="margin-top:8px;">📭 本周暂无免费游戏</div>`;
     }
+
+    if (data.screenshot_path) {
+        html += `<div class="result-hint">📸 截图: ${escapeHtml(data.screenshot_path)}</div>`;
+    }
+
+    box.innerHTML = html;
 }
 
 function showSaveResult(box, data) {
