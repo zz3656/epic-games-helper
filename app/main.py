@@ -68,6 +68,7 @@ templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 # ============== 进度追踪 ==============
 claim_progress: Dict[str, Dict[str, Any]] = {}
 claim_results: Dict[str, Dict[str, Any]] = {}  # 存储完整结果，供进度查询时附加
+pending_verifications: Dict[str, Dict[str, Any]] = {}  # 待输入邮箱验证码的任务
 
 
 def track_progress(claim_id: str, step: str, status: str, extra: Optional[Dict] = None):
@@ -83,10 +84,24 @@ def store_result(claim_id: str, result_dict: Dict[str, Any]):
     claim_results[claim_id] = result_dict
 
 
+def register_verification(claim_id: str, username: str):
+    """登记需要邮箱验证码的任务"""
+    pending_verifications[claim_id] = {
+        "claim_id": claim_id,
+        "username": username,
+        "started_at": __import__('datetime').datetime.now().isoformat(timespec="seconds"),
+    }
+
+
+def unregister_verification(claim_id: str):
+    pending_verifications.pop(claim_id, None)
+
+
 # ============== 数据模型 ==============
 class Credentials(BaseModel):
     username: str = Field(..., min_length=1, max_length=200)
     password: str = Field(..., min_length=1, max_length=200)
+    verification_code: str = Field(default="", max_length=20)
 
 
 class SaveCredentialsRequest(BaseModel):
@@ -147,23 +162,41 @@ async def claim_now(creds: Credentials):
     logger.info("收到领取请求，用户: %s (claim_id=%s)", _mask(creds.username), claim_id)
 
     async def _do_claim():
-        # 设置进度回调桥接
         scheduler._on_progress = lambda step, status: track_progress(claim_id, step, status)
         try:
-            result = await scheduler.run_now(creds.username, creds.password)
+            # 优先使用请求中提供的验证码，否则从临时文件读取
+            verification_code = creds.verification_code or None
+            if not verification_code:
+                try:
+                    import os
+                    if os.path.exists(VERIFICATION_CODE_FILE):
+                        with open(VERIFICATION_CODE_FILE) as f:
+                            verification_code = f.read().strip()
+                        # 读取后删除（一次性使用）
+                        os.remove(VERIFICATION_CODE_FILE)
+                        logger.info("使用临时保存的邮箱验证码")
+                except Exception as e:
+                    logger.warning("读取临时验证码失败: %s", e)
+            result = await scheduler.run_now(
+                creds.username, creds.password,
+                verification_code=verification_code,
+            )
             result_dict = _result_to_dict(result)
-            store_result(claim_id, result_dict)
-            track_progress(claim_id, f"领取完成: {'成功' if result.success else '失败'}", "done")
+            # 检查是否需要邮箱验证
+            if result_dict.get("needs_verification"):
+                register_verification(claim_id, creds.username)
+                track_progress(claim_id, "需要邮箱验证码", "done")
+            else:
+                store_result(claim_id, result_dict)
+                track_progress(claim_id, f"领取完成: {'成功' if result.success else '失败'}", "done")
             return result
         except Exception as e:
             track_progress(claim_id, f"异常: {e}", "done")
             raise
         finally:
             creds.password = None  # noqa: F841
-            # 清理回调
             scheduler._on_progress = None
 
-    # 后台执行领取，立即返回 claim_id
     asyncio.create_task(_do_claim())
     return JSONResponse(content={"claim_id": claim_id, "message": "领取任务已启动"})
 
@@ -172,15 +205,18 @@ async def claim_now(creds: Credentials):
 async def claim_progress_endpoint(claim_id: str):
     """查询领取进度（轮询接口）"""
     progress = claim_progress.get(claim_id)
+    needs_verification = claim_id in pending_verifications
     if not progress:
-        # 检查是否已有结果
         result_dict = claim_results.get(claim_id)
         if result_dict:
             claim_results.pop(claim_id, None)
             return JSONResponse(content={"claim_id": claim_id, "step": "领取完成", "status": "done",
                                         "result": result_dict})
+        # 是否有等待中的邮箱验证
+        if needs_verification:
+            return JSONResponse(content={"claim_id": claim_id, "step": "需要邮箱验证码",
+                                        "status": "needs_verification", "result": None})
         raise HTTPException(status_code=404, detail="任务不存在或已过期")
-    # 如果进度已完成，附加完整结果
     if progress.get("status") == "done":
         result_dict = claim_results.get(claim_id)
         if result_dict:
@@ -188,7 +224,55 @@ async def claim_progress_endpoint(claim_id: str):
         claim_progress.pop(claim_id, None)
         if result_dict:
             claim_results.pop(claim_id, None)
+    if needs_verification:
+        progress["status"] = "needs_verification"
     return JSONResponse(content=progress)
+
+
+class VerificationCodeRequest(BaseModel):
+    claim_id: str = Field(..., min_length=1)
+    code: str = Field(..., min_length=4, max_length=10)
+
+
+# 用于跨请求保存验证代码的临时文件路径
+VERIFICATION_CODE_FILE = "/app/data/.pending_verification_code"
+
+
+@app.post("/api/claim/verification")
+async def submit_verification_code(req: VerificationCodeRequest):
+    """提交邮箱验证码，保存到临时文件供下次领取使用。"""
+    pending = pending_verifications.get(req.claim_id)
+    if not pending:
+        # 仍然允许保存验证码，以便下次领取时读取
+        pass
+    # 写入临时文件
+    try:
+        import os
+        os.makedirs("/app/data", exist_ok=True)
+        with open(VERIFICATION_CODE_FILE, "w") as f:
+            f.write(req.code)
+        # 清理已验证任务
+        unregister_verification(req.claim_id)
+        track_progress(req.claim_id, "已保存验证码，请重新触发领取任务", "done")
+        return JSONResponse(content={
+            "claim_id": req.claim_id,
+            "message": "验证码已保存，请在 60 秒内点击「开始领取」按钮重新触发任务，系统会自动使用该验证码",
+            "code_saved": True,
+        })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"保存失败: {e}")
+
+
+@app.get("/api/claim/verification/pending")
+async def pending_verification_status():
+    """检查是否有待提交的验证码"""
+    import os
+    code_exists = os.path.exists(VERIFICATION_CODE_FILE)
+    pending = list(pending_verifications.values())
+    return {
+        "pending_tasks": pending,
+        "saved_code_exists": code_exists,
+    }
 
 
 @app.get("/api/claim/progress/{claim_id}")
@@ -286,6 +370,7 @@ def _result_to_dict(result) -> dict:
         "login_failed": result.success is False and result.games == [] and (
             result.error or ""
         ).startswith("登录失败"),
+        "needs_verification": (result.error or "").startswith("需要邮箱验证"),
         "games": [
             {
                 "title": g.title, "url": g.url,

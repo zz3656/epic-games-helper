@@ -72,7 +72,8 @@ class ClaimScheduler:
             self.scheduler.shutdown(wait=False)
             logger.info("调度器已关闭")
 
-    async def run_now(self, username: str, password: str, on_progress: Optional[Callable] = None) -> ClaimResult:
+    async def run_now(self, username: str, password: str, on_progress: Optional[Callable] = None,
+                       verification_code: Optional[str] = None) -> ClaimResult:
         """手动触发一次领取"""
         if self._lock.locked():
             return ClaimResult(
@@ -82,7 +83,7 @@ class ClaimScheduler:
             )
         self._on_progress = on_progress
         async with self._lock:
-            result = await self._execute(username, password)
+            result = await self._execute(username, password, verification_code=verification_code)
             self._last_result = result
             self.store.add(result)
             return result
@@ -115,7 +116,7 @@ class ClaimScheduler:
             username = None
             password = None
 
-    async def _execute(self, username: str, password: str) -> ClaimResult:
+    async def _execute(self, username: str, password: str, verification_code: Optional[str] = None) -> ClaimResult:
         """实际执行领取流程"""
         logger.info("执行领取任务，用户: %s", _mask(username))
         started = datetime.now().isoformat(timespec="seconds")
@@ -130,7 +131,7 @@ class ClaimScheduler:
                 screenshot_dir="/app/screenshots",
                 on_progress=self._on_progress,
             ) as claimer:
-                result = await claimer.run(username, password)
+                result = await claimer.run(username, password, verification_code=verification_code)
 
             logger.info(
                 "任务完成: success=%s, games=%d, error=%s",

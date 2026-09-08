@@ -22,6 +22,7 @@ from playwright.async_api import (
 )
 
 from app.claimer_games import fetch_free_games, claim_one
+from app.claimer_login import LoginHandler
 
 logger = logging.getLogger(__name__)
 
@@ -76,28 +77,6 @@ class EpicClaimer:
             result = await claimer.run(username, password)
     """
 
-    # 登录页面选择器（Epic 经常改版，需以宽松选择器 + 多重 fallback）
-    LOGIN_IFRAME_SELECTOR = "iframe[name^='account']"
-    EMAIL_INPUT_SELECTORS = [
-        'input#email',
-        'input[name="email"]',
-        'input[type="email"]',
-        'input[autocomplete="username"]',
-    ]
-    PASSWORD_INPUT_SELECTORS = [
-        'input#password',
-        'input[name="password"]',
-        'input[type="password"]',
-        'input[autocomplete="current-password"]',
-    ]
-    SUBMIT_BUTTON_SELECTORS = [
-        'button#login',
-        'button[type="submit"]',
-        'button:has-text("登录")',
-        'button:has-text("Log In")',
-        'button:has-text("Sign In")',
-    ]
-
     # 领取按钮选择器
     GET_BUTTON_SELECTORS = [
         'button[data-testid="purchase-cta-button"]',
@@ -123,6 +102,8 @@ class EpicClaimer:
         self._browser: Optional[Browser] = None
         # 进度回调: callable(claim_id, step, status)
         self._on_progress = on_progress
+        # 登录处理器（拆分到 claimer_login.py）
+        self._login_handler = LoginHandler(self)
         # 关键：把账号密码以局部变量保存，with 块结束时立即清空
         self._username: Optional[str] = None
         self._password: Optional[str] = None
@@ -172,13 +153,15 @@ class EpicClaimer:
                 logger.warning("Error stopping playwright: %s", e)
 
     async def run(self, username: str, password: str,
-                  on_progress: Optional[Callable] = None) -> ClaimResult:
+                  on_progress: Optional[Callable] = None,
+                  verification_code: Optional[str] = None) -> ClaimResult:
         """主入口：登录 -> 抓取免费游戏 -> 逐个领取
         
         Args:
             username: 账号
             password: 密码
             on_progress: 进度回调 (step, status) -> None/Coroutine
+            verification_code: 邮箱验证码（如果已知）
         """
         started = datetime.now().isoformat(timespec="seconds")
         result = ClaimResult(
@@ -216,9 +199,15 @@ class EpicClaimer:
             # 1) 登录
             if progress_fn:
                 await _emit(progress_fn, "正在登录…", "active")
-            login_ok = await self._login(page)
-            if not login_ok:
-                result.error = "登录失败：可能账号密码错误，或 Epic 登录页结构变化"
+            login_status = await self._login_handler.login(page, verification_code)
+            if login_status == "needs_verification":
+                result.error = "需要邮箱验证：Epic 要求邮箱验证码。请在 Web 界面输入验证码，或先在本地手动登录一次以信任本设备"
+                result.screenshot_path = await self._save_screenshot(page, "verification_required")
+                if progress_fn:
+                    await _emit(progress_fn, "需要邮箱验证", "done")
+                return result
+            if login_status != "success":
+                result.error = "登录失败：账号密码错误，或 Epic 登录页结构变化"
                 result.screenshot_path = await self._save_screenshot(page, "login_failed")
                 if progress_fn:
                     await _emit(progress_fn, "登录失败", "done")
@@ -287,81 +276,16 @@ class EpicClaimer:
         return result
 
     # ============== 登录 ==============
-    async def _login(self, page: Page) -> bool:
-        """执行登录流程"""
-        try:
-            await page.goto(self.LOGIN_URL, wait_until="domcontentloaded", timeout=60000)
-        except PWTimeout:
-            logger.error("访问登录页超时")
-            return False
-
-        # Epic 登录页通常会把表单放在 iframe 里，先尝试切到 iframe
-        iframe = None
-        try:
-            iframe = await page.wait_for_selector(
-                self.LOGIN_IFRAME_SELECTOR, timeout=5000, state="attached"
-            )
-        except PWTimeout:
-            logger.info("未发现登录 iframe，尝试直接在主页面定位输入框")
-
-        target: Page = page
-        if iframe:
-            frame = await iframe.content_frame()
-            if frame:
-                target = frame
-                logger.info("已切换到登录 iframe")
-
-        # 输入邮箱
-        email_ok = await self._fill_first_available(
-            target, self.EMAIL_INPUT_SELECTORS, self._username
-        )
-        if not email_ok:
-            logger.error("找不到邮箱输入框")
-            return False
-
-        # 输入密码
-        pwd_ok = await self._fill_first_available(
-            target, self.PASSWORD_INPUT_SELECTORS, self._password
-        )
-        if not pwd_ok:
-            logger.error("找不到密码输入框")
-            return False
-
-        # 点击登录
-        submit_ok = await self._click_first_available(target, self.SUBMIT_BUTTON_SELECTORS)
-        if not submit_ok:
-            logger.error("找不到登录按钮")
-            return False
-
-        # 等待登录完成：跳转到 store 或账号中心
-        try:
-            await page.wait_for_url(
-                lambda url: ("store.epicgames.com" in url or "epicgames.com/account" in url),
-                timeout=30000,
-            )
-            return True
-        except PWTimeout:
-            # 检查是否出现账号菜单（某些场景下 URL 不变）
-            try:
-                await page.wait_for_selector(
-                    '[data-testid="user-accountexposed"]', timeout=8000
-                )
-                return True
-            except PWTimeout:
-                # 检查是否有错误提示
-                err = await self._get_text_safe(
-                    target,
-                    '[role="alert"], .error, [data-testid="error"], '
-                    '[data-testid="login-error"], [class*="ErrorMessage"], '
-                    '[class*="error"]',
-                )
-                if err:
-                    logger.error("登录错误提示: %s", err)
-                    return False
-                # 未检测到成功迹象，视为登录失败
-                logger.error("登录超时，未跳转到首页且未检测到账号菜单")
-                return False
-
+    # 二步验证输入框选择器（Epic 会要求邮箱验证码）
+    VERIFICATION_CODE_SELECTORS = [
+        'input#code',
+        'input[name="code"]',
+        'input[name="verificationCode"]',
+        'input[id*="code"]',
+        'input[autocomplete="one-time-code"]',
+        'input[type="text"][name*="otp"]',
+        'input[type="text"][inputmode="numeric"]',
+    ]
     # ============== 工具方法 ==============
     async def _fill_first_available(self, page: Page, selectors: List[str], value: str) -> bool:
         for sel in selectors:
