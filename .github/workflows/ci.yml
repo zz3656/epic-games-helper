@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'app/**'
+      - 'requirements.txt'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  lint-and-syntax:
+    name: Python syntax check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Check syntax
+        run: |
+          echo "=== Python 语法检查 ==="
+          python -c "
+          import ast, sys
+          from pathlib import Path
+          errors = 0
+          for f in Path('app').rglob('*.py'):
+              try:
+                  ast.parse(f.read_text())
+                  print(f'OK  {f}')
+              except SyntaxError as e:
+                  print(f'ERR {f}: {e}')
+                  errors += 1
+          sys.exit(errors)
+          "
+
+      - name: Validate docker-compose.yml
+        run: |
+          python -c "
+          import yaml
+          with open('docker-compose.yml') as f:
+              data = yaml.safe_load(f)
+          assert 'services' in data, 'Missing services'
+          assert 'epic-claimer' in data['services'], 'Missing epic-claimer service'
+          print('docker-compose.yml OK')
+          "

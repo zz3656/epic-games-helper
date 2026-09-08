@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Epic Games 自动领取</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎮 Epic Games 免费游戏自动领取</h1>
+            <p class="subtitle">基于 Docker · Playwright · 每周自动执行</p>
+        </header>
+
+        <!-- 凭证状态横幅 -->
+        <div id="status-banner" class="banner info" hidden></div>
+
+        <!-- ===== 模式 1：手动立即领取 ===== -->
+        <section class="card">
+            <h2>📋 立即领取（一次性）</h2>
+            <p class="tip">
+                ⚠️ 此模式下账号密码<strong>仅在本次请求中使用</strong>，不会保存。
+                适合临时用一下。
+            </p>
+
+            <form id="claim-form">
+                <div class="form-group">
+                    <label for="username">Epic 账号（邮箱）</label>
+                    <input type="text" id="username" name="username"
+                           autocomplete="username" placeholder="your-email@example.com" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Epic 密码</label>
+                    <div class="password-wrap">
+                        <input type="password" id="password" name="password"
+                               autocomplete="current-password" placeholder="请输入密码" required>
+                        <button type="button" id="toggle-pwd" class="toggle-pwd" title="显示/隐藏密码">👁</button>
+                    </div>
+                </div>
+
+                <button type="submit" id="submit-btn" class="btn-primary">
+                    <span class="btn-text">🚀 开始领取</span>
+                    <span class="btn-spinner" hidden>领取中…</span>
+                </button>
+            </form>
+
+            <div id="result" class="result" hidden></div>
+        </section>
+
+        <!-- ===== 模式 2：保存凭证 + 自动领取 ===== -->
+        <section class="card highlight">
+            <h2>🔁 保存凭证 · 每周自动领取</h2>
+            <p class="tip">
+                🔒 账号密码会用 <strong>AES 加密</strong>后存入容器内的
+                <code>/app/data/credentials.enc</code>。每周定时自动解密使用 → 用完立即从内存清除。
+            </p>
+            <p class="hint">
+                ⚠️ 与"零留存"模式不同：此模式需要持久化凭证。
+                <strong>密钥 (EPIC_MASTER_KEY) 一旦泄露，已保存的凭证即泄露</strong>。
+                请妥善保管 .env 文件，不要提交到 git。
+            </p>
+
+            <div id="cred-status" class="cred-status">
+                <span class="status-dot"></span>
+                <span id="cred-status-text">加载中…</span>
+            </div>
+
+            <form id="save-form">
+                <div class="form-group">
+                    <label for="save-username">Epic 账号（邮箱）</label>
+                    <input type="text" id="save-username" name="username"
+                           autocomplete="username" placeholder="your-email@example.com">
+                </div>
+
+                <div class="form-group">
+                    <label for="save-password">Epic 密码</label>
+                    <div class="password-wrap">
+                        <input type="password" id="save-password" name="password"
+                               autocomplete="new-password" placeholder="请输入密码">
+                        <button type="button" id="toggle-save-pwd" class="toggle-pwd" title="显示/隐藏密码">👁</button>
+                    </div>
+                </div>
+
+                <div class="form-check">
+                    <input type="checkbox" id="enable-auto" checked>
+                    <label for="enable-auto">保存后启用每周自动领取</label>
+                </div>
+
+                <div class="btn-row">
+                    <button type="submit" id="save-btn" class="btn-primary">
+                        <span class="btn-text">💾 保存凭证（加密）</span>
+                        <span class="btn-spinner" hidden>保存中…</span>
+                    </button>
+                    <button type="button" id="delete-btn" class="btn-danger" hidden>🗑 删除凭证</button>
+                </div>
+            </form>
+
+            <div id="save-result" class="result" hidden></div>
+        </section>
+
+        <!-- ===== 自动领取开关（独立） ===== -->
+        <section class="card">
+            <h2>⏰ 自动调度</h2>
+            <p>每周 <strong>{{ schedule_info.day }}</strong>（北京时间）
+                <strong>{{ "%02d"|format(schedule_info.hour) }}:{{ "%02d"|format(schedule_info.minute) }}</strong>
+                自动检查（<code>{{ schedule_info.timezone }}</code>）
+            </p>
+
+            <div class="switch-row">
+                <span>自动领取开关：</span>
+                <label class="switch">
+                    <input type="checkbox" id="auto-switch">
+                    <span class="slider"></span>
+                </label>
+                <span id="auto-status-text" class="auto-status"></span>
+            </div>
+
+            <p class="hint">
+                ℹ️ 需要先在上方"保存凭证"区块保存账号密码，自动领取才会真正执行。
+                没有凭证时开启开关也会被拒绝。
+            </p>
+        </section>
+
+        <!-- ===== 历史 ===== -->
+        <section class="card">
+            <h2>📜 历史记录</h2>
+            <button id="refresh-history" class="btn-secondary">🔄 刷新</button>
+            <div id="history-list" class="history-list">
+                <p class="hint">暂无记录</p>
+            </div>
+        </section>
+
+        <footer>
+            <p>🔒 隐私承诺：未启用"保存凭证"时，账号密码仅在请求内存中存在</p>
+            <p>⚙️ 启用"保存凭证"后，账号密码以 AES-128-CBC 加密后持久化</p>
+        </footer>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
