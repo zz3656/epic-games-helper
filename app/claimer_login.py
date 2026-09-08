@@ -135,6 +135,45 @@ class LoginHandler:
     def __init__(self, parent):
         self.parent = parent
 
+    async def _try_solve_hcaptcha(self, page, target) -> bool:
+        """尝试自动点击 hCaptcha checkbox
+
+        hCaptcha 包含嵌套 iframe，需先切到 host frame 再切到 challenge frame。
+        简单 checkbox 点击可能触发图片挑战 — 那需要图像识别，无法自动完成。
+        返回 True 表示成功点击，False 表示失败。
+        """
+        try:
+            iframe_selectors = [
+                'iframe[src*="hcaptcha.com"][src*="checkbox"]',
+                'iframe[src*="hcaptcha.com"]',
+            ]
+            for iframe_sel in iframe_selectors:
+                iframe_handle = await page.query_selector(iframe_sel)
+                if not iframe_handle:
+                    continue
+                frame = await iframe_handle.content_frame()
+                if not frame:
+                    continue
+                checkbox_selectors = [
+                    '#checkbox',
+                    '.checkmark',
+                    '[id*="checkbox"]',
+                    'div[role="checkbox"]',
+                ]
+                for cb_sel in checkbox_selectors:
+                    try:
+                        cb = await frame.query_selector(cb_sel)
+                        if cb:
+                            await cb.click()
+                            logger.info("hCaptcha checkbox 已点击: %s", cb_sel)
+                            return True
+                    except Exception:
+                        continue
+            return False
+        except Exception as e:
+            logger.warning("自动点击 hCaptcha 失败: %s", e)
+            return False
+
     def _classify_error(self, page_text: str, current_url: str) -> LoginResult:
         """根据页面文本和 URL 分类失败原因"""
         text_lower = page_text.lower()
@@ -333,16 +372,36 @@ class LoginHandler:
                     document.querySelector('[class*="captcha"]') ||
                     document.querySelector('[id*="captcha"]') ||
                     document.querySelector('.h-captcha') ||
-                    document.querySelector('#hcap-script')
+                    document.querySelector('#hcap-script') ||
+                    document.querySelector('[data-hcaptcha-widget-id]')
                 );
             }
             """)
             if has_captcha:
-                logger.warning("检测到图形验证码")
+                logger.warning("检测到 hCaptcha，尝试自动点击验证 checkbox")
+                # 尝试自动点击 hCaptcha checkbox
+                captcha_clicked = await self._try_solve_hcaptcha(page, target)
+                if captcha_clicked:
+                    # 点击后等一段时间看看是否解决
+                    await asyncio.sleep(5)
+                    # 再次检查：是否还存在验证码表单
+                    still_captcha = await page.evaluate("""
+                    () => !!document.querySelector('iframe[src*="hcaptcha"]')
+                    """)
+                    if not still_captcha:
+                        logger.info("hCaptcha 自动解决成功")
+                        # 验证后可能需要重新点击登录
+                        await self.parent._click_first_available(
+                            target, self.SUBMIT_BUTTON_SELECTORS
+                        )
+                        await asyncio.sleep(2)
+                        continue  # 重新检查结果
+                # 自动解决失败，提示用户手动处理
+                logger.warning("hCaptcha 自动解决失败，需手动处理")
                 await self.parent._save_screenshot(page, "login_captcha")
                 return LoginResult(
                     status=LoginStatus.CAPTCHA_REQUIRED,
-                    reason="Epic 要求完成图形验证码，请先在浏览器手动登录一次以通过验证",
+                    reason="Epic 要求完成图形验证码 (hCaptcha)。可设置 HEADLESS=false 以可见模式运行手动验证，或等待几分钟后重试",
                     screenshot_tag="login_captcha",
                 )
 

@@ -208,11 +208,12 @@ function showClaimResult(box, data) {
             },
             captcha_required: {
                 icon: "🧩",
-                title: "需要图形验证码",
+                title: "需要图形验证码 (hCaptcha)",
                 tips: [
-                    "Epic 要求完成 hCaptcha 验证",
-                    "请在本地浏览器手动登录一次以通过验证",
-                    "验证后会自动信任本设备",
+                    "Epic 检测到异常环境，弹出 hCaptcha 验证",
+                    "点击下方的截图链接查看验证页面",
+                    "如需手动验证：设置环境变量 HEADLESS=false 重启容器，在可见模式下手动点击",
+                    "或等待 5-10 分钟后重试（hCaptcha 冷却）",
                 ],
             },
             network_error: {
@@ -249,8 +250,9 @@ function showClaimResult(box, data) {
             <div class="result-hint" style="margin-top:10px;">
                 💡 建议：<br>${tipsHtml}
             </div>
-            ${data.screenshot_path ? `<div class="result-hint">📸 截图: ${escapeHtml(data.screenshot_path)}</div>` : ''}
+            ${data.screenshot_path ? (() => { const fn = escapeHtml(data.screenshot_path.split('/').pop()); return `<div class="result-hint">📸 截图: <a href="/api/screenshots/${fn}" target="_blank" style="color:#00d4ff;">${escapeHtml(data.screenshot_path)}</a> <a href="#" data-toggle-preview="${fn}" style="color:#7b2ff7; margin-left:8px;">[查看/隐藏]</a></div><div class="screenshot-preview" data-preview-for="${fn}" style="margin-top:8px; display:none;"><img src="/api/screenshots/${fn}" style="max-width:100%; border-radius:8px; border:1px solid rgba(255,255,255,0.1);"/></div>`; })() : ''}
         `;
+        bindScreenshotToggle(box);
         return;
     }
 
@@ -260,8 +262,9 @@ function showClaimResult(box, data) {
         box.innerHTML = `
             <div class="result-title"><strong>❌ 领取失败</strong></div>
             <div class="result-error">${escapeHtml(data.error)}</div>
-            ${data.screenshot_path ? `<div class="result-hint">📸 截图: ${escapeHtml(data.screenshot_path)}</div>` : ''}
+            ${data.screenshot_path ? (() => { const fn = escapeHtml(data.screenshot_path.split('/').pop()); return `<div class="result-hint">📸 截图: <a href="/api/screenshots/${fn}" target="_blank" style="color:#00d4ff;">${escapeHtml(data.screenshot_path)}</a> <a href="#" data-toggle-preview="${fn}" style="color:#7b2ff7; margin-left:8px;">[查看/隐藏]</a></div><div class="screenshot-preview" data-preview-for="${fn}" style="margin-top:8px; display:none;"><img src="/api/screenshots/${fn}" style="max-width:100%; border-radius:8px; border:1px solid rgba(255,255,255,0.1);"/></div>`; })() : ''}
         `;
+        bindScreenshotToggle(box);
         return;
     }
 
@@ -302,10 +305,25 @@ function showClaimResult(box, data) {
 
     if (data.screenshot_path) {
         const filename = escapeHtml(data.screenshot_path.split('/').pop());
-        html += `<div class="result-hint">📸 截图: <a href="/api/screenshots/${filename}" target="_blank" style="color:#00d4ff;">${escapeHtml(data.screenshot_path)}</a></div>`;
+        html += `<div class="result-hint">📸 截图: <a href="/api/screenshots/${filename}" target="_blank" style="color:#00d4ff;">${escapeHtml(data.screenshot_path)}</a> <a href="#" data-toggle-preview="${filename}" style="color:#7b2ff7; margin-left:8px;">[查看/隐藏]</a></div>`;
+        html += `<div class="screenshot-preview" data-preview-for="${filename}" style="margin-top:8px; display:none;"><img src="/api/screenshots/${filename}" style="max-width:100%; border-radius:8px; border:1px solid rgba(255,255,255,0.1);"/></div>`;
     }
 
     box.innerHTML = html;
+    bindScreenshotToggle(box);
+}
+
+function bindScreenshotToggle(box) {
+    box.querySelectorAll('a[data-toggle-preview]').forEach(a => {
+        a.addEventListener('click', (e) => {
+            e.preventDefault();
+            const filename = a.dataset.togglePreview;
+            const preview = box.querySelector(`div[data-preview-for="${filename}"]`);
+            if (preview) {
+                preview.style.display = preview.style.display === 'none' ? 'block' : 'none';
+            }
+        });
+    });
 }
 
 function showSaveResult(box, data) {
