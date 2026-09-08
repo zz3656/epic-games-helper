@@ -22,6 +22,9 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Install pyyaml
+        run: pip install pyyaml
+
       - name: Check syntax
         run: |
           echo "=== Python 语法检查 ==="
