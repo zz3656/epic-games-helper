@@ -239,7 +239,8 @@ function showClaimResult(box, data) {
     }
 
     if (data.screenshot_path) {
-        html += `<div class="result-hint">📸 截图: ${escapeHtml(data.screenshot_path)}</div>`;
+        const filename = escapeHtml(data.screenshot_path.split('/').pop());
+        html += `<div class="result-hint">📸 截图: <a href="/api/screenshots/${filename}" target="_blank" style="color:#00d4ff;">${escapeHtml(data.screenshot_path)}</a></div>`;
     }
 
     box.innerHTML = html;

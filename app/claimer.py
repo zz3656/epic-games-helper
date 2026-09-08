@@ -84,6 +84,11 @@ class EpicClaimer:
         'button:has-text("免费获取")',
         'button:has-text("Get")',
         'button:has-text("Free")',
+        'button:has-text("免费下载")',
+        'button[class*="purchase"]',
+        'button[aria-label*="Get"]',
+        'button[aria-label*="Free"]',
+        'a[data-testid="purchase-cta-button"]',
     ]
     PLACE_ORDER_BUTTON_SELECTORS = [
         'button:has-text("下单")',
@@ -91,8 +96,17 @@ class EpicClaimer:
         'button:has-text("接受")',
         'button:has-text("Accept")',
         'button:has-text("I Agree")',
+        'button[class*="confirm"]',
+        'button[aria-label*="Place Order"]',
+        'button[aria-label*="Accept"]',
     ]
-    ALREADY_OWNED_TEXT = ["已在库中", "Owned", "已拥有", "In Library"]
+    ALREADY_OWNED_TEXT = ["已在库中", "Owned", "已拥有", "In Library", "已在库"]
+
+    # 不是免费的标识（游戏过期、需购买等）
+    NOT_FREE_TEXTS = [
+        "Purchase", "Buy Now", "立即购买", "价格", "$", "€", "¥",
+        "Unavailable", "不在提供", "不可领取",
+    ]
 
     def __init__(self, headless: bool = True, screenshot_dir: str = "/app/screenshots",
                  on_progress: Optional[Callable] = None):

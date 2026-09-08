@@ -116,11 +116,13 @@ async def claim_one(claimer: "EpicClaimer", page: Page, url: str) -> tuple:
     except PWTimeout:
         return ("failed", "页面访问超时")
 
-    # 等待按钮出现
+    # 等待页面完全加载（含动态内容）
     try:
-        await page.wait_for_load_state("networkidle", timeout=15000)
+        await page.wait_for_load_state("networkidle", timeout=20000)
     except PWTimeout:
         pass
+    # 额外等待 Vue/React 渲染
+    await asyncio.sleep(2)
 
     # 检查是否已拥有
     page_text = await claimer._get_page_text(page)
@@ -132,10 +134,26 @@ async def claim_one(claimer: "EpicClaimer", page: Page, url: str) -> tuple:
     if _is_coming_soon(page_text):
         return ("not_started", "游戏还未免费，暂不领取")
 
-    # 点击获取按钮
+    # 检查是否不是免费（页面明确显示价格、购买等）
+    for not_free in claimer.NOT_FREE_TEXTS:
+        if not_free in page_text:
+            return ("not_free", f"游戏不是免费（页面包含 {not_free}）")
+
+    # 点击获取按钮 - 先等可能需要 1-2 秒才出现
+    await asyncio.sleep(2)
     clicked = await claimer._click_first_available(page, claimer.GET_BUTTON_SELECTORS)
     if not clicked:
-        return ("not_free", "未找到'获取'按钮，可能不是免费游戏或已结束")
+        # 截图以诊断
+        await claimer._save_screenshot(page, "claim_button_missing")
+        # 检查页面上有什么按钮
+        page_buttons = await page.evaluate("""
+        () => Array.from(document.querySelectorAll('button, a[role="button"]'))
+            .slice(0, 20)
+            .map(b => (b.innerText || b.textContent || '').trim())
+            .filter(t => t)
+        """)
+        logger.error("未找到领取按钮，页面按钮: %s", page_buttons)
+        return ("not_free", f"未找到'获取'按钮，页面按钮: {page_buttons[:5]}")
 
     # 等待弹窗/二次确认
     await asyncio.sleep(1.5)
@@ -158,4 +176,6 @@ async def claim_one(claimer: "EpicClaimer", page: Page, url: str) -> tuple:
         text = await claimer._get_page_text(page)
         if any(owned in text for owned in claimer.ALREADY_OWNED_TEXT):
             return ("already_claimed", "领取后已拥有")
+        # 截图以诊断
+        await claimer._save_screenshot(page, "claim_unknown")
         return ("failed", "未检测到成功提示")

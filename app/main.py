@@ -6,6 +6,8 @@ import uuid
 from contextlib import asynccontextmanager
 from typing import Any, Dict, Optional
 
+from fastapi.responses import FileResponse
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -332,6 +334,34 @@ async def credentials_status():
         "auto_claim_enabled": scheduler.auto_claim_enabled,
         **cred_store.status(),
     }
+
+
+@app.get("/api/screenshots")
+async def list_screenshots():
+    """列出可用截图（调试用）"""
+    screenshot_dir = "/app/screenshots"
+    try:
+        if not os.path.exists(screenshot_dir):
+            return {"files": []}
+        files = sorted(
+            [f for f in os.listdir(screenshot_dir) if f.endswith(".png")],
+            key=lambda x: os.path.getmtime(os.path.join(screenshot_dir, x)),
+            reverse=True,
+        )
+        return {"files": files[:20]}
+    except Exception as e:
+        return {"files": [], "error": str(e)}
+
+
+@app.get("/api/screenshots/{filename}")
+async def get_screenshot(filename: str):
+    """获取截图（调试用）"""
+    screenshot_dir = "/app/screenshots"
+    path = os.path.join(screenshot_dir, filename)
+    # 安全检查：防止路径穿越
+    if not os.path.exists(path) or ".." in filename or "/" in filename:
+        raise HTTPException(status_code=404, detail="截图不存在")
+    return FileResponse(path)
 
 
 @app.post("/api/auto-claim/toggle")
