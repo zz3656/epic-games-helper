@@ -105,6 +105,7 @@ class EpicAPIClient:
     def __init__(self):
         self.client = httpx.AsyncClient(
             timeout=30.0,
+            follow_redirects=True,  # 允许跟随 302 重定向（Epic 购买接口会返回 302）
             headers={
                 # 关键：使用 Epic 官方 launcher 的 User-Agent
                 # 否则 OAuth endpoint 会返回 401
