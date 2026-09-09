@@ -461,12 +461,14 @@ class EpicAPIClient:
                 pass
 
             # 尝试从不同字段获取 order_id
-            order_id = (
-                purchase_data.get("orderId")
-                or purchase_data.get("id")
-                or purchase_data.get("order_id")
-                or ""
-            )
+            order_id = ""
+            if purchase_data and isinstance(purchase_data, dict):
+                order_id = (
+                    purchase_data.get("orderId")
+                    or purchase_data.get("id")
+                    or purchase_data.get("order_id")
+                    or ""
+                )
 
             if not order_id:
                 logger.warning("购买响应未返回 order_id: status=%d body=%s", purchase_status, purchase_text[:300] if purchase_text else "(empty)")
