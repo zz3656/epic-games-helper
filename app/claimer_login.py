@@ -364,7 +364,7 @@ class LoginHandler:
                 logger.warning("检测到 hCaptcha，尝试自动处理...")
 
                 # 尝试自动点击 checkbox
-                captcha_clicked = await self._try_solve_hcaptcha(page, target)
+                captcha_clicked = await self._try_solve_hcaptcha(page)
                 if captcha_clicked:
                     # hCaptcha 自动点击后，等待其完成验证（低风险场景下自动通过）
                     # 最多等待 15 秒，等待 iframe 消失（验证完成标志）
