@@ -363,45 +363,70 @@ class LoginHandler:
             if has_captcha or has_captcha_text:
                 logger.warning("检测到 hCaptcha，尝试自动处理...")
 
-                # 尝试自动点击 checkbox
-                captcha_clicked = await self._try_solve_hcaptcha(page)
-                if captcha_clicked:
-                    # hCaptcha 自动点击后，等待其完成验证（低风险场景下自动通过）
-                    # 最多等待 15 秒，等待 iframe 消失（验证完成标志）
-                    await asyncio.sleep(3)  # 先等 3 秒让 hCaptcha JS 执行
+                # 多次尝试自动点击 checkbox（hCaptcha 可能需要多次点击才生效）
+                for click_attempt in range(3):
+                    captcha_clicked = await self._try_solve_hcaptcha(page)
+                    if captcha_clicked:
+                        logger.info("hCaptcha checkbox 点击成功（第 %d 次）", click_attempt + 1)
+                        # 点击后等一段较长时间让 hCaptcha 完成验证
+                        # hCaptcha 服务端验证需要 5-15 秒
+                        await asyncio.sleep(8)
+                        still_captcha = await page.evaluate("""
+                        () => !!document.querySelector('iframe[src*="hcaptcha"]')
+                        """)
+                        if not still_captcha:
+                            logger.info("hCaptcha 自动验证通过，重新提交登录")
+                            await self.parent._click_first_available(
+                                target, self.SUBMIT_BUTTON_SELECTORS
+                            )
+                            await asyncio.sleep(3)
+                            break  # 跳出点击循环，continue 到主循环
+                    else:
+                        logger.warning("hCaptcha checkbox 点击失败（第 %d 次）", click_attempt + 1)
+                        break  # 没找到 checkbox，无需重试
+
+                # 点击后如果 hCaptcha 还在，再多等一段时间（最多 30 秒）
+                still_captcha_final = await page.evaluate("""
+                () => !!document.querySelector('iframe[src*="hcaptcha"]')
+                """)
+                if not still_captcha_final:
+                    # hCaptcha 已通过，重新提交
+                    logger.info("hCaptcha 已通过，重新提交登录表单")
+                    await self.parent._click_first_available(
+                        target, self.SUBMIT_BUTTON_SELECTORS
+                    )
+                    await asyncio.sleep(3)
+                    continue
+
+                # hCaptcha 还在 — 可能是需要图片验证。
+                # 继续等一段时间（30 秒）看看是否在后台完成验证
+                logger.info("hCaptcha 仍在等待完成，再等待 30 秒...")
+                await self.parent._save_screenshot(page, "login_captcha_waiting")
+                for extra_wait in range(30):
+                    await asyncio.sleep(1)
                     still_captcha = await page.evaluate("""
                     () => !!document.querySelector('iframe[src*="hcaptcha"]')
                     """)
                     if not still_captcha:
-                        logger.info("hCaptcha 自动验证通过，重新提交登录")
+                        logger.info("hCaptcha 在额外等待中通过（第 %d 秒）", extra_wait)
                         await self.parent._click_first_available(
                             target, self.SUBMIT_BUTTON_SELECTORS
                         )
                         await asyncio.sleep(3)
-                        continue  # 重新检查结果
+                        break
 
-                    # hCaptcha iframe 还在，但可能是图片验证型（需要人工）
-                    # 自动点击 + 短等待无法解决，返回需要人工处理
-                    logger.warning("hCaptcha 需要人工验证（图片选择），等待 120 秒")
-                    await self.parent._save_screenshot(page, "login_captcha_waiting")
-                    solved = await self._wait_for_manual_captcha_solve(page, timeout_seconds=120)
-                    if solved:
-                        # 人工验证后重新提交
-                        logger.info("重新提交登录表单")
-                        await self.parent._click_first_available(
-                            target, self.SUBMIT_BUTTON_SELECTORS
-                        )
-                        await asyncio.sleep(3)
-                        continue
+                # 最终检查 hCaptcha 状态
+                still_captcha = await page.evaluate("""
+                () => !!document.querySelector('iframe[src*="hcaptcha"]')
+                """)
+                if not still_captcha:
+                    continue  # 重新检查结果
 
-                # 自动点击 checkbox 失败
-                logger.warning("hCaptcha 自动处理失败，需人工处理")
+                # hCaptcha 处理超时（30 秒都没通过）
+                # 记录详细信息后继续尝试后续领取，因为 Epic 可能最终还是接受了
+                logger.warning("hCaptcha 长时间未通过（30秒），检查 Epic 是否最终接受")
                 await self.parent._save_screenshot(page, "login_captcha")
-                return LoginResult(
-                    status=LoginStatus.CAPTCHA_REQUIRED,
-                    reason="Epic 要求完成图形验证码 (hCaptcha)。请检查 /app/screenshots/ 中的截图，或手动在 Epic 网站登录一次以信任此设备",
-                    screenshot_tag="login_captcha",
-                )
+                # 不返回失败，让主循环继续检查 — 可能 Epic 服务端实际已经接受了
 
             # URL 仍停留在登录页 + 仍存在表单 -> 登录失败（用精细分类）
             if "id.epicgames.com" in current_url and attempt_idx >= 1:

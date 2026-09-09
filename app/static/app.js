@@ -212,9 +212,8 @@ function showClaimResult(box, data) {
                 tips: [
                     "Epic 检测到异常环境，弹出 hCaptcha 验证",
                     "点击下方的截图链接查看验证页面",
-                    "方法 1：在个人电脑浏览器中登录一次 Epic 账号（信任此设备）",
-                    "方法 2：修改 docker-compose.yml 添加 ENABLE_VNC=true，重启后通过 VNC 手动完成验证",
-                    "之后再次点击「开始领取」即可",
+                    "建议：等待 5-10 分钟后重试（Epic 会降低风险等级）",
+                    "如频繁出现：检查服务器 IP 是否被 Epic 标记（使用住宅 IP 可能有助于避免）",
                 ],
             },
             network_error: {

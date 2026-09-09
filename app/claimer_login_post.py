@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 
 
 # hCaptcha 文本指示器
+# 注意：不能包含 "继续"（Epic 第一阶段点邮箱后点“继续”是正常流程）
 HCAPTCHA_TEXT_INDICATORS = [
-    "继续",
     "verify you are human",
     "hcaptcha", "hCaptcha",
     "are you human", "i'm not a robot",
@@ -25,6 +25,9 @@ HCAPTCHA_TEXT_INDICATORS = [
     "点击以下方块",
     "请选择所有包含",
     "select all images",
+    "正在进行人机验证",
+    "human verification",
+    "证明你不是机器人",
 ]
 
 
