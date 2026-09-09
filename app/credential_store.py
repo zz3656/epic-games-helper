@@ -10,6 +10,12 @@
 安全前提：
 - 攻击者必须同时获得密文文件 + master key 才能还原密码
 - 推荐 master key 通过 Docker secret 挂载而非环境变量
+
+v2.1 增加 Device Auth 支持：
+- device auth credentials（device_id/secret/account_id）加密存储到 /app/data/device_auth.enc
+- 永不过期（除非用户主动撤销）
+- 无需保存账号密码即可领取
+- 避免 Playwright/Chromium、避免 hCaptcha、避免服务器风控
 """
 import base64
 import json
@@ -44,8 +50,10 @@ class CredentialStore:
         self,
         key: Optional[str] = None,
         file_path: str = "/app/data/credentials.enc",
+        device_auth_path: str = "/app/data/device_auth.enc",
     ):
         self.file_path = file_path
+        self.device_auth_path = device_auth_path
         self._lock = threading.Lock()
         self._fernet: Optional[Fernet] = None
         self._init_key(key)
@@ -70,7 +78,7 @@ class CredentialStore:
         return Fernet.generate_key().decode()
 
     def is_configured(self) -> bool:
-        """是否已配置凭证"""
+        """是否已配置账号密码凭证"""
         if not os.path.exists(self.file_path):
             return False
         try:
@@ -130,7 +138,7 @@ class CredentialStore:
             return None
 
     def delete(self) -> bool:
-        """删除凭证"""
+        """删除账号密码凭证"""
         try:
             with self._lock:
                 if os.path.exists(self.file_path):
@@ -153,6 +161,69 @@ class CredentialStore:
             except Exception:
                 pass
         return info
+
+    # ============================================
+    # Device Auth (永不过期的认证令牌)
+    # ============================================
+
+    def has_device_auth(self) -> bool:
+        """是否已保存 device auth"""
+        return os.path.exists(self.device_auth_path)
+
+    def save_device_auth(self, credentials) -> bool:
+        """加密保存 device auth credentials"""
+        if not self._fernet:
+            logger.error("Fernet 未初始化")
+            return False
+        try:
+            plaintext = json.dumps(credentials.to_dict()).encode("utf-8")
+            ciphertext = self._fernet.encrypt(plaintext)
+
+            with self._lock:
+                os.makedirs(os.path.dirname(self.device_auth_path), exist_ok=True)
+                fd = os.open(
+                    self.device_auth_path,
+                    os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
+                    0o600,
+                )
+                with os.fdopen(fd, "wb") as f:
+                    f.write(ciphertext)
+            logger.info("Device auth 已加密保存: account_id=%s", credentials.account_id)
+            return True
+        except Exception as e:
+            logger.exception("保存 device auth 失败")
+            return False
+
+    def load_device_auth(self):
+        """解密读取 device auth credentials"""
+        if not self._fernet or not os.path.exists(self.device_auth_path):
+            return None
+        try:
+            with open(self.device_auth_path, "rb") as f:
+                ciphertext = f.read()
+            plaintext = self._fernet.decrypt(ciphertext)
+            data = json.loads(plaintext.decode("utf-8"))
+            # Avoid circular import
+            from app.epic_api import DeviceAuthCredentials
+            return DeviceAuthCredentials.from_dict(data)
+        except InvalidToken:
+            logger.error("解密 device auth 失败：master key 不匹配")
+            return None
+        except Exception as e:
+            logger.exception("读取 device auth 失败")
+            return None
+
+    def delete_device_auth(self) -> bool:
+        """删除 device auth"""
+        try:
+            with self._lock:
+                if os.path.exists(self.device_auth_path):
+                    os.remove(self.device_auth_path)
+            logger.info("Device auth 已删除")
+            return True
+        except Exception as e:
+            logger.error("删除 device auth 失败: %s", e)
+            return False
 
 
 def _mask(u: str) -> str:

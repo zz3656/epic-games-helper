@@ -69,8 +69,13 @@ templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 # 注册拆分的路由
 from app.api_vnc import router as vnc_router
 from app.api_vnc_ws import router as vnc_ws_router
+from app.api_device_auth import router as device_auth_router, set_credential_store
 app.include_router(vnc_router)
 app.include_router(vnc_ws_router)
+app.include_router(device_auth_router)
+
+# 注入凭据存储到 device auth 模块
+set_credential_store(cred_store)
 
 
 # ============== 进度追踪 ==============
