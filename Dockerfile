@@ -9,14 +9,13 @@ ENV PYTHONUNBUFFERED=1 \
     DEBIAN_FRONTEND=noninteractive
 
 # 安装系统依赖（Playwright 浏览器运行所需）
+# 注意：VNC 相关依赖已移除，改为纯截图方案处理 hCaptcha
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     gnupg \
     ca-certificates \
     fonts-liberation \
     fonts-noto-cjk \
-    fonts-wqy-microhei \
-    fonts-wqy-zenhei \
     libasound2 \
     libatk-bridge2.0-0 \
     libatk1.0-0 \
@@ -48,14 +47,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxrender1 \
     libxss1 \
     libxtst6 \
-    # 可选 VNC 服务（用于手动验证 hCaptcha 等）
-    xvfb \
-    x11vnc \
-    novnc \
-    websockify \
-    x11-utils \
-    xterm \
-    fluxbox \
     && rm -rf /var/lib/apt/lists/*
 
 # 创建工作目录
