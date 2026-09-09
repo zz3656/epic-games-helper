@@ -216,7 +216,7 @@ function showClaimResult(box, data) {
                     "⚠ noVNC 黑屏是正常的：只有当领取任务运行时会看到 Chrome，请先点击「开始领取」",
                     "完成后领取任务会自动继续（等待最多 120 秒）",
                 ],
-                vncLink: data.vnc_enabled ? (window.location.protocol + "//" + window.location.hostname + ":6080/vnc.html") : null,
+                vncLink: data.vnc_enabled ? (window.location.protocol + "//" + window.location.host + "/vnc") : null,
             },
             network_error: {
                 icon: "📡",
@@ -248,11 +248,11 @@ function showClaimResult(box, data) {
         const tipsHtml = info.tips.map(t => `• ${escapeHtml(t)}`).join("<br>");
         const vncSection = info.vncLink ? `
             <div class="vnc-cta" style="margin-top:14px; padding:12px; background:rgba(123,47,247,0.15); border-left:3px solid #7b2ff7; border-radius:8px;">
-                <div style="font-weight:600; margin-bottom:6px;">🎯 打开 noVNC 手动验证 hCaptcha</div>
+                <div style="font-weight:600; margin-bottom:6px;">🎯 打开嵌入式 noVNC（同一端口 8000）</div>
                 <a href="${escapeHtml(info.vncLink)}" target="_blank" style="display:inline-block; padding:8px 14px; background:linear-gradient(90deg,#7b2ff7,#00d4ff); color:#fff; border-radius:8px; text-decoration:none; font-weight:600; font-size:14px;">
                     🖥️ 点击这里打开 noVNC
                 </a>
-                <div style="margin-top:8px; font-size:12px; opacity:0.8;">URL: ${escapeHtml(info.vncLink)}</div>
+                <div style="margin-top:8px; font-size:12px; opacity:0.8;">URL: ${escapeHtml(info.vncLink)} <strong style="color:#7b2ff7;">（同源 8000 端口）</strong></div>
                 <div style="margin-top:6px; font-size:12px; opacity:0.7;">在打开的页面中完成 hCaptcha 后，领取任务会自动继续</div>
             </div>
         ` : (data.login_status === "captcha_required" ? `

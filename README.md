@@ -82,9 +82,10 @@ services:
     image: zz3656/epic-games-claimer:latest
     container_name: epic-games-claimer
     restart: unless-stopped
+    # 仅需 8000 端口：API 和 VNC 都通过同一个端口访问
+    # VNC 嵌入式访问: http://服务器IP:8000/vnc
     ports:
       - "8000:8000"
-      - "6080:6080"   # noVNC Web 端口
     environment:
       - TZ=Asia/Shanghai
       - SCHEDULE_DAY=thu

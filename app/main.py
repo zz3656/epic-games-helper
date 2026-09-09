@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional
 
 from fastapi.responses import FileResponse
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -68,7 +68,9 @@ templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
 # 注册拆分的路由
 from app.api_vnc import router as vnc_router
+from app.api_vnc_ws import router as vnc_ws_router
 app.include_router(vnc_router)
+app.include_router(vnc_ws_router)
 
 
 # ============== 进度追踪 ==============
@@ -138,6 +140,19 @@ async def index(request: Request):
             "credential_configured": cred_store.is_configured(),
         },
     )
+
+
+@app.get("/vnc", response_class=HTMLResponse)
+async def vnc_page(request: Request):
+    """嵌入式 VNC 页面（不需要单独的端口）
+
+    仅需 8000 端口即可访问 VNC，不需要 6080/5900 端口映射。
+    """
+    html_path = os.path.join(BASE_DIR, "static", "embedded-vnc.html")
+    if not os.path.exists(html_path):
+        raise HTTPException(status_code=404, detail="VNC 页面文件不存在")
+    with open(html_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
 
 
 # ============== API 路由 ==============

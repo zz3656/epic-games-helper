@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Epic Games Claimer - 嵌入式 VNC</title>
+    <link rel="icon" type="image/x-icon" href="novnc/app/images/icons/novnc.ico">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="novnc/app/styles/base.css">
+    <link rel="stylesheet" href="novnc/app/styles/input.css">
+    <style>
+        body { margin: 0; background: #000; overflow: hidden; }
+        /* 隐藏连接面板，直接全屏 */
+        #noVNC_control_bar, #noVNC_control_bar_anchor,
+        #noVNC_status, #noVNC_connect_panel {
+            display: none !important;
+        }
+        #noVNC_container {
+            position: fixed !important;
+            top: 0; left: 0; right: 0; bottom: 0;
+            width: 100vw !important;
+            height: 100vh !important;
+        }
+        /* 全屏 VNC 模式 */
+        .noVNC_center { padding-top: 20px; }
+    </style>
+</head>
+<body class="noVNC_loading">
+
+    <div id="noVNC_fallback_error" class="noVNC_center">
+        <div>
+            <div>noVNC encountered an error:</div>
+            <div id="noVNC_fallback_errormsg"></div>
+        </div>
+    </div>
+
+    <div id="noVNC_transition">
+        <div id="noVNC_transition_text"></div>
+        <div class="noVNC_spinner"></div>
+    </div>
+
+    <div id="noVNC_container">
+        <textarea id="noVNC_keyboardinput" autocapitalize="off"
+            autocomplete="off" spellcheck="false" tabindex="-1"></textarea>
+    </div>
+
+    <audio id="noVNC_bell">
+        <source src="novnc/app/sounds/bell.oga" type="audio/ogg">
+        <source src="novnc/app/sounds/bell.mp3" type="audio/mpeg">
+    </audio>
+
+    <script type="module">
+        // 加载 noVNC
+        import * as WebUtil from './novnc/app/webutil.js';
+        import RFB from './novnc/core/rfb.js';
+
+        let rfb;
+
+        function connect() {
+            // 连接到同源的 WebSocket 代理
+            const host = window.location.hostname;
+            const port = window.location.port || (window.location.protocol === 'https:' ? '443' : '80');
+            const path = 'vnc-ws';
+            const password = '';
+
+            rfb = new RFB({
+                target: document.getElementById('noVNC_container'),
+                encrypt: window.location.protocol === 'https:',
+                wsProtocols: ['binary'],
+            });
+
+            rfb.addEventListener("connect", () => {
+                console.log("VNC 连接成功");
+                document.body.classList.remove('noVNC_loading');
+                document.body.classList.add('noVNC_connecting');
+                setTimeout(() => {
+                    document.body.classList.remove('noVNC_connecting');
+                    document.body.classList.add('noVNC_connected');
+                }, 500);
+            });
+
+            rfb.addEventListener("disconnect", (e) => {
+                console.log("VNC 断开", e.detail);
+                document.body.classList.remove('noVNC_connected');
+                document.body.classList.add('noVNC_disconnected');
+            });
+
+            rfb.addEventListener("credentialsrequired", () => {
+                const pw = prompt("VNC 密码:");
+                if (pw !== null) rfb.sendCredentials({ password: pw });
+            });
+
+            // 连接到后端 WebSocket 代理
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${wsProtocol}//${host}:${port}/${path}`;
+
+            console.log("连接到:", wsUrl);
+            rfb.connect(wsUrl, password);
+        }
+
+        // 页面加载完成后自动连接
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', connect);
+        } else {
+            connect();
+        }
+    </script>
+</body>
+</html>

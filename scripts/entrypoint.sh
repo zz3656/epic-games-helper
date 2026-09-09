@@ -87,13 +87,16 @@ if [ "${ENABLE_VNC:-false}" = "true" ]; then
         x11vnc -display :99 -forever -nopw -quiet &
     fi
     sleep 1
-    # 启动 noVNC（端口 6080）
-    if [ -d "/usr/share/novnc" ]; then
-        websockify --web=/usr/share/novnc 6080 localhost:5900 &
-    else
-        websockify 6080 localhost:5900 &
+    # noVNC WebSocket 代理现在是 FastAPI 内置 (/vnc-ws 端点)
+    # 但仍启动传统 websockify 作为备选 (端口 6080)，需要用户单独映射
+    if [ "${EXTERNAL_NOVNC:-false}" = "true" ]; then
+        if [ -d "/usr/share/novnc" ]; then
+            websockify --web=/usr/share/novnc 6080 localhost:5900 &
+        else
+            websockify 6080 localhost:5900 &
+        fi
+        sleep 1
     fi
-    sleep 1
     # 启动轻量级窗口管理器（让 Chrome 窗口可以显示）
     if command -v fluxbox >/dev/null 2>&1; then
         fluxbox -display :99 &
