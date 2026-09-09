@@ -363,14 +363,45 @@ class EpicClaimer:
     ]
     # ============== 工具方法 ==============
     async def _fill_first_available(self, page: Page, selectors: List[str], value: str) -> bool:
+        # 先尝试 CSS 选择器
         for sel in selectors:
             try:
-                el = await page.wait_for_selector(sel, timeout=3000, state="visible")
+                el = await page.wait_for_selector(sel, timeout=2500, state="visible")
                 if el:
                     await el.fill(value)
+                    logger.info("填充字段成功: %s", sel)
                     return True
             except Exception:
                 continue
+        # 备选：用 JS 按语义查找（仅针对邮箱/密码）
+        if value and isinstance(value, str) and "@" in value and len(value) > 5:
+            # 邮箱：使用 type=email 或 autocomplete=username
+            try:
+                el = await page.evaluate_handle("""
+                () => document.querySelector('input[type="email"], input[autocomplete="username"], input[id*="email" i], input[name*="email" i]')
+                """)
+                if el:
+                    await el.fill(value)
+                    logger.info("使用语义选择器填充邮箱")
+                    return True
+            except Exception:
+                pass
+        else:
+            # 密码：使用 type=password 且不是 confirm
+            try:
+                el = await page.evaluate_handle("""
+                () => {
+                    const inputs = document.querySelectorAll('input[type="password"]');
+                    // 选择第一个 password（不是确认密码）
+                    return inputs[0];
+                }
+                """)
+                if el:
+                    await el.fill(value)
+                    logger.info("使用语义选择器填充密码")
+                    return True
+            except Exception:
+                pass
         return False
 
     async def _click_first_available(self, page: Page, selectors: List[str]) -> bool:

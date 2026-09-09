@@ -39,6 +39,16 @@ class LoginHandler:
     """封装 Epic 登录流程"""
 
     LOGIN_IFRAME_SELECTOR = "iframe[name^='account']"
+    # Epic 可能使用多种 iframe 名称
+    LOGIN_IFRAME_SELECTORS = [
+        'iframe[name^="account"]',
+        'iframe[id^="account"]',
+        'iframe[src*="login"]',
+        'iframe[title*="登录"]',
+        'iframe[title*="Login"]',
+        'iframe[title*="Sign"]',
+        # 通用：包含密码输入框的 iframe
+    ]
     EMAIL_INPUT_SELECTORS = [
         'input#email',
         'input[name="email"]',
@@ -187,24 +197,44 @@ class LoginHandler:
                 screenshot_tag="login_network_error",
             )
 
-        # 2) 切换到登录 iframe
+        # 2) 切换到登录 iframe（尝试多种选择器）
         iframe = None
-        try:
-            iframe = await page.wait_for_selector(
-                self.LOGIN_IFRAME_SELECTOR, timeout=5000, state="attached"
-            )
-        except PWTimeout:
-            logger.info("未发现登录 iframe")
-
         target: Page = page
-        if iframe:
+
+        # 等待页面加载完成
+        await asyncio.sleep(2)
+
+        # 尝试多种 iframe 选择器
+        for sel in self.LOGIN_IFRAME_SELECTORS:
             try:
-                frame = await iframe.content_frame()
-                if frame:
-                    target = frame
-                    logger.info("已切换到登录 iframe")
+                iframe_handle = await page.query_selector(sel)
+                if iframe_handle:
+                    frame = await iframe_handle.content_frame()
+                    if frame:
+                        # 验证这个 iframe 中是否有密码输入框
+                        try:
+                            has_password = await frame.evaluate("""
+                            () => !!document.querySelector('input[type="password"], input[name="password"]')
+                            """)
+                            if has_password:
+                                target = frame
+                                iframe = iframe_handle
+                                logger.info("已切换到登录 iframe: %s", sel)
+                                break
+                        except Exception:
+                            pass
             except Exception as e:
-                logger.warning("切换 iframe 失败: %s", e)
+                logger.debug("检测 iframe %s 失败: %s", sel, e)
+
+        if not iframe:
+            # 备选：直接在主页面检查是否有密码输入框
+            has_password_main = await page.evaluate("""
+            () => !!document.querySelector('input[type="password"], input[name="password"]')
+            """)
+            if has_password_main:
+                logger.info("未检测到 iframe，但主页有密码输入框，直接使用主页面")
+            else:
+                logger.info("未发现登录 iframe，且主页面无密码输入框")
 
         # 3) 如果提供验证码且页面处于验证步骤，填入
         if verification_code:
@@ -230,10 +260,10 @@ class LoginHandler:
                             screenshot_tag="login_page_changed",
                         )
 
-        # 4) 输入邮箱
-        email_ok = await self.parent._fill_first_available(
-            target, self.EMAIL_INPUT_SELECTORS, self.parent._username
-        )
+        # 4) 输入邮箱 - 使用智能表单填充
+        from app.claimer_login_form import fill_email, fill_password, click_login_button
+        email_ok = await fill_email(target, self.parent._username)
+
         if not email_ok:
             logger.error("找不到邮箱输入框")
             await self.parent._save_screenshot(page, "login_page_changed")
@@ -244,9 +274,8 @@ class LoginHandler:
             )
 
         # 5) 输入密码
-        pwd_ok = await self.parent._fill_first_available(
-            target, self.PASSWORD_INPUT_SELECTORS, self.parent._password
-        )
+        pwd_ok = await fill_password(target, self.parent._password)
+
         if not pwd_ok:
             logger.error("找不到密码输入框")
             await self.parent._save_screenshot(page, "login_page_changed")
@@ -256,10 +285,8 @@ class LoginHandler:
                 screenshot_tag="login_page_changed",
             )
 
-        # 6) 点击登录按钮
-        submit_ok = await self.parent._click_first_available(
-            target, self.SUBMIT_BUTTON_SELECTORS
-        )
+        # 6) 点击登录按钮 - 使用智能点击
+        submit_ok = await click_login_button(target)
         if not submit_ok:
             logger.error("找不到登录按钮")
             await self.parent._save_screenshot(page, "login_page_changed")
