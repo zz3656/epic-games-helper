@@ -257,17 +257,32 @@ function showClaimResult(box, data) {
             </div>
         ` : (data.login_status === "captcha_required" ? `
             <div class="vnc-cta" style="margin-top:14px; padding:12px; background:rgba(251,191,36,0.15); border-left:3px solid #fbbf24; border-radius:8px;">
-                <div style="font-weight:600; margin-bottom:6px;">⚠️ 未启用 VNC，无法手动验证</div>
-                <div style="font-size:13px; line-height:1.6;">
-                    1. 编辑 <code>docker-compose.yml</code>，添加环境变量：<br>
-                    <code style="display:block; margin:6px 0; padding:6px; background:rgba(0,0,0,0.3); border-radius:4px;">
-                        environment:<br>
-                        &nbsp;&nbsp;- ENABLE_VNC=true<br>
-                        &nbsp;&nbsp;- VNC_PASSWORD=你的密码（可选）
-                    </code>
-                    2. 添加端口映射：<code>6080:6080</code><br>
-                    3. 重启容器：<code>docker compose up -d</code><br>
-                    4. 重试领取任务，将自动弹出 noVNC 验证链接
+                <div style="font-weight:600; margin-bottom:10px;">⚠️ 未启用 VNC，无法手动解决 hCaptcha</div>
+                <div style="font-size:13px; line-height:1.8;">
+                    <strong>请按以下步骤在服务器上操作（SSH 到服务器后执行）：</strong><br>
+                    <div style="margin-top:8px;">
+                        <strong>第 1 步：</strong>拉取新镜像（含 VNC 支持）：<br>
+                        <code style="display:block; margin:4px 0; padding:6px 8px; background:rgba(0,0,0,0.3); border-radius:4px; font-family:monospace;">docker compose pull</code>
+                    </div>
+                    <div style="margin-top:8px;">
+                        <strong>第 2 步：</strong>编辑 <code>docker-compose.yml</code>，修改 <code>epic-claimer</code> 服务：<br>
+                        <code style="display:block; margin:4px 0; padding:6px 8px; background:rgba(0,0,0,0.3); border-radius:4px; font-family:monospace; white-space:pre;">
+environment:
+  - ENABLE_VNC=true
+ports:
+  - "8000:8000"
+  - "6080:6080"   # 新增 noVNC Web 端口</code>
+                    </div>
+                    <div style="margin-top:8px;">
+                        <strong>第 3 步：</strong>重启容器：<br>
+                        <code style="display:block; margin:4px 0; padding:6px 8px; background:rgba(0,0,0,0.3); border-radius:4px; font-family:monospace;">docker compose up -d</code>
+                    </div>
+                    <div style="margin-top:8px;">
+                        <strong>第 4 步：</strong>回到本页面，再次点击「🚀 开始领取」<br>
+                    </div>
+                    <div style="margin-top:8px;">
+                        <strong>第 5 步：</strong>领取失败后，本页面会显示 noVNC 链接，点击在新窗口打开，手动完成 hCaptcha
+                    </div>
                 </div>
             </div>
         ` : '');
