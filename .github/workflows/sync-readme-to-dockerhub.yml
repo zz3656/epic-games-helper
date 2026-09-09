@@ -22,7 +22,7 @@ jobs:
         env:
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_SHORT_DESC: Epic Games 周免自动领取 · 设备码授权 · 零浏览器零验证码 · 镜像 ~150MB。
+          DOCKERHUB_SHORT_DESC: Epic Games 周免游戏跟踪 · 一键领取跳转 · 设备码授权零浏览器。
         run: |
           python3 << 'PYEOF'
           import json, os, urllib.request, urllib.error
@@ -61,7 +61,7 @@ jobs:
               "short_description": short_desc,
           }
           payload = json.dumps(data, ensure_ascii=False).encode("utf-8")
-          url = f"https://hub.docker.com/v2/repositories/{dockerhub_username}/epic-games-claimer"
+          url = f"https://hub.docker.com/v2/repositories/{dockerhub_username}/epic-games-helper"
 
           req = urllib.request.Request(
               url,
@@ -74,7 +74,7 @@ jobs:
                   code = resp.getcode()
                   if code in (200, 201):
                       print(f"✅ Docker Hub description updated!")
-                      print(f"   https://hub.docker.com/r/{dockerhub_username}/epic-games-claimer")
+                      print(f"   https://hub.docker.com/r/{dockerhub_username}/epic-games-helper")
                   else:
                       print(f"⚠️ Unexpected status: {code}")
                       exit(1)

@@ -2,8 +2,8 @@ version: "3.8"
 
 services:
   epic-claimer:
-    image: zz3656/epic-games-claimer:latest
-    container_name: epic-games-claimer
+    image: zz3656/epic-games-helper:latest
+    container_name: epic-games-helper
     build: .
     restart: unless-stopped
     ports:

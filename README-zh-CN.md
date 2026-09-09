@@ -1,18 +1,50 @@
-# 🎮 Epic Games 免费游戏自动领取
+# 🎮 Epic Games 免费游戏助手
 
-> 基于 **Epic OAuth Device Code** 的周免游戏自动领取服务。**零浏览器、零验证码、零 Playwright**。
+> Epic Games 周免游戏跟踪 + 一键领取跳转。**追踪本周免费游戏、识别已拥有游戏、一键跳转领取页面**。
 
 🇺🇸 [English README](README.md)
 
-## ✨ 单一认证方式：**设备码授权**
+---
 
-| 特性 | 优势 |
-|------|------|
-| ⚡ **一次授权永久使用** | 用户在自己浏览器登录一次，工具获得永不过期的 token |
-| 🚫 **零 hCaptcha** | 登录走 Epic 官方 OAuth 页面，没有任何自动化特征 |
-| 📦 **零 Playwright/Chromium** | 纯 HTTP API 调用，容器仅 ~150MB |
-| 🛡️ **零 IP 风控** | 浏览器登录从你电脑的 IP 出发，不是服务器 IP |
-| ♾️ **永不过期** | 只有你手动撤销 Epic 设备授权才会失效 |
+## 📌 这是什么？
+
+`epic-games-helper` 是一个轻量级的 HTTP API + Web UI 服务：
+
+- 📡 **追踪** Epic 每周免费游戏（每周四更新）
+- 🗂️ **关联** 你的 Epic 库（自动识别已拥有）
+- 🎯 **生成** 每个游戏的一键领取链接
+- ⏰ **定时** 检查新一周免费游戏
+
+> **重要提示：** Epic Games 的购买接口**无法**通过纯 API 完成（需要浏览器 session、XSRF、hCaptcha 等），
+> 所以本工具**无法直接帮你自动领取游戏**。但它做了所有周边工作，让领取只需**一键**。
+
+查看[路线图](#-路线图)了解已实现与未来规划。
+
+---
+
+## ✨ 功能
+
+### ✅ 已实现
+
+- 🔑 **Epic Device Code OAuth** — 在你自己浏览器登录一次，获得永不过期 token（不存密码，无 hCaptcha）
+- 🗓️ **本周免费游戏列表** — 从 Epic 公开 catalog API (`freeGamesPromotions`) 自动拉取
+- 📚 **Library 关联** — 使用 Epic 的 `library-service` API 标记已拥有游戏
+- 🖼️ **丰富游戏卡片** — 封面图、标题、原价、免费时段、"剩 N 天"徽章
+- 🎯 **一键领取链接** — 每个游戏生成专属 checkout URL，点击直达 Epic 购买页（已预填 offer）
+- ⏰ **定时检查** — APScheduler 每周触发（可配置日/小时）
+- 🔌 **REST API** — `/docs` 开箱即用 Swagger UI
+- 🛡️ **Fernet 加密 token 存储**（AES-128-CBC + HMAC），文件权限 `0600`
+- 🐳 **多架构 Docker 镜像**（`linux/amd64` + `linux/arm64`）
+
+### 🚧 路线图 — 正在努力实现
+
+- 🎮 **真正的自动领取** — 寻找绕过浏览器限制的路径（TrustedServer policy、GQL 突变，或浏览器兜底）
+- 👥 **多账号支持** — 当前单槽位凭据存储，需重构为 N 个账号
+- 🪟 **内置浏览器兜底** — API 路径被封时，回退到内置 headless Chromium
+- 📲 **推送通知** — 新一周游戏上线时立即推送（支持 Telegram / 邮件 / Webhook）
+- 🌍 **多地区支持** — 当前硬编码 `zh-CN/CN`，需支持多 locale
+
+---
 
 ## 🚀 快速开始
 
@@ -20,30 +52,33 @@
 
 ```bash
 docker run -d \
-  --name epic-claimer \
+  --name epic-helper \
   -p 8000:8000 \
   -v $(pwd)/data:/app/data \
   --restart unless-stopped \
-  zz3656/epic-games-claimer:latest
+  zz3656/epic-games-helper:latest
 ```
 
 ### 2. 授权
 
 打开 **http://localhost:8000**：
 
-1. 进入 "🎯 Epic 设备码登录" 区块
-2. 点击 "🔑 Epic 设备码授权"
-3. 复制 `user_code`，点击链接跳转到 Epic 官方授权页
-4. 在自己浏览器登录 Epic 账号并授权设备
-5. Web UI 自动保存 token，之后每周自动领取
+1. 点击 **"🔑 Epic 设备码授权"** 区块
+2. 复制 `user_code`，点击 Epic 授权链接
+3. 在自己浏览器登录 Epic 账号并授权设备
+4. Web UI 自动检测授权成功并保存 token
+
+之后每周免费游戏都会自动追踪。
+
+---
 
 ## 🐳 Docker Compose
 
 ```yaml
 services:
-  epic-claimer:
-    image: zz3656/epic-games-claimer:latest
-    container_name: epic-games-claimer
+  epic-helper:
+    image: zz3656/epic-games-helper:latest
+    container_name: epic-games-helper
     restart: unless-stopped
     ports:
       - "8000:8000"
@@ -56,98 +91,100 @@ services:
       - ./data:/app/data
     security_opt:
       - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
 ```
 
-> 📌 **多架构镜像**：支持 `linux/amd64` 和 `linux/arm64`（群晖、威联通、Unraid 等 ARM 设备也能跑）
+> 📌 **多架构镜像**：`linux/amd64` 和 `linux/arm64`（群晖、威联通、Unraid、Raspberry Pi 4+ 都能跑）
+
+---
 
 ## 🔐 隐私与安全
 
 | 存储 | 加密 | 文件 |
 |---|---|---|
-| Device Auth Token | Fernet (AES-128-CBC) | `/app/data/device_auth.enc` (0600) |
-| Master key | 明文 | `/app/data/.env` (0600) |
+| Device Auth Token | Fernet (AES-128-CBC + HMAC) | `/app/data/device_auth.enc`（`0600`）|
+| Master key | 明文 | `/app/data/.env`（`0600`）|
 
-**只存储 token，不存储密码。**
+**只存储 OAuth token，不存密码。**
+
+---
 
 ## ⚙️ 配置
 
-| 变量 | 默认 | 说明 |
+| 环境变量 | 默认 | 说明 |
 |---|---|---|
-| `EPIC_MASTER_KEY` | *自动生成* | Fernet 加密密钥 |
-| `TZ` | `Asia/Shanghai` | 时区 |
-| `SCHEDULE_DAY` | `thu` | 周几触发（mon-sun） |
-| `SCHEDULE_HOUR` | `17` | 触发小时（0-23） |
-| `SCHEDULE_MINUTE` | `0` | 触发分钟（0-59） |
+| `EPIC_MASTER_KEY` | *自动生成* | Fernet 密钥（显式设置可跨容器重建保留 token）|
+| `TZ` | `Asia/Shanghai` | 定时器时区 |
+| `SCHEDULE_DAY` | `thu` | 触发日（`mon`–`sun`）|
+| `SCHEDULE_HOUR` | `17` | 触发小时（`0`–`23`）|
+| `SCHEDULE_MINUTE` | `0` | 触发分钟（`0`–`59`）|
 | `LOG_LEVEL` | `INFO` | 日志级别 |
-| `AUTO_CLAIM_ENABLED` | `false` | 启动时自动开启自动领取 |
+| `AUTO_CLAIM_ENABLED` | `false` | 启动时自动开启自动检查 |
+
+---
 
 ## 🛠️ API
 
-API 文档：**http://localhost:8000/docs**
+Swagger 文档：**http://localhost:8000/docs**
 
 | 接口 | 方法 | 说明 |
 |---|---|---|
 | `/api/health` | GET | 健康检查 |
+| `/api/free-games` | GET | 本周免费游戏 + 是否已拥有 + 领取链接 |
+| `/api/device-auth/status` | GET | 设备码授权是否已配置 |
+| `/api/device-auth/account-info` | GET | 验证已存储账号是否仍可用 |
 | `/api/device-auth/request` | POST | 申请 device code |
 | `/api/device-auth/poll/{code}` | GET | 轮询授权状态 |
-| `/api/device-auth/status` | GET | 查询 device auth 状态 |
-| `/api/device-auth/claim-now` | POST | 用 token 立即领取 |
+| `/api/device-auth/claim-now` | POST | 生成本周游戏领取链接 |
 | `/api/claim/progress/{id}` | GET | 轮询领取进度 |
 | `/api/device-auth` | DELETE | 撤销授权 |
-| `/api/device-auth/test/*` | POST | 调试端点 |
-| `/api/auto-claim/toggle` | POST | 开关自动领取 |
+| `/api/auto-claim/toggle` | POST | 开关自动检查 |
 | `/api/history` | GET | 历史记录 |
 
-## 🐛 故障排查
-
-### 设备码授权失败
-
-Web UI → "🛠 调试选项" → 点击测试按钮，输出会显示 Epic API 的实际错误。常见原因：
-
-- **所有 client_id 都失效**：Epic 轮换了 OAuth 客户端。修改 `app/epic_api.py` 中的 `EPIC_CLIENTS`
-- **容器网络问题**：容器无法访问 Epic API
-- **被限流**：请求太频繁，等待 10 分钟
-
-### Master key 不匹配
-
-```bash
-rm ./data/device_auth.enc
-# Web 界面重新授权
-```
+---
 
 ## 🏗️ 架构
 
 ```
-┌──────────────────────────────────────────────────┐
-│  Web UI（浏览器）                                 │
-│  • 设备码登录 + 立即领取 + 自动领取开关            │
-│  • 历史记录 + 调试面板                            │
-└──────────────────────────────────────────────────┘
-                       ↓
-┌──────────────────────────────────────────────────┐
-│  FastAPI 后端（端口 8000）                        │
-│  • /api/device-auth/*    设备码授权              │
-│  • /api/device-auth/claim-now  立即领取         │
-│  • /api/auto-claim/toggle 开关                   │
-└──────────────────────────────────────────────────┘
-                       ↓
-┌──────────────────────────────────────────────────┐
-│  Scheduler（每周四 17:00）                        │
-│  EpicAPIClient → 纯 HTTP API 调用                │
-└──────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│  Web UI（浏览器）                                   │
+│  • 设备码登录区块                                  │
+│  • 每账号游戏库（已拥有 / 可领取）                  │
+│  • 每个游戏一键领取按钮                            │
+└──────────────────────────────────────────────────────┘
+                        ↓
+┌──────────────────────────────────────────────────────┐
+│  FastAPI 后端（端口 8000）                          │
+│  • /api/device-auth/*      OAuth 流程               │
+│  • /api/free-games         周免游戏 + 库检查        │
+│  • /api/device-auth/claim-now  生成 checkout URL    │
+└──────────────────────────────────────────────────────┘
+                        ↓
+┌──────────────────────────────────────────────────────┐
+│  EpicAPIClient（纯 HTTP，无浏览器）                 │
+│  • freeGamesPromotions  → 本周免费游戏              │
+│  • library-service      → 已拥有检查                │
+│  • /store/purchase （只读，为真正的自动领取保留）  │
+└──────────────────────────────────────────────────────┘
 ```
+
+---
 
 ## 📁 项目结构
 
 ```
-epicgames/
+epic-games-helper/
 ├── app/
 │   ├── main.py                # FastAPI 入口
-│   ├── epic_api.py            # 🎯 纯 HTTP API 客户端
-│   ├── api_device_auth.py     # 设备码授权 API
-│   ├── scheduler.py           # 定时调度
+│   ├── epic_api.py            # 🎯 纯 HTTP Epic 客户端
+│   ├── api_device_auth.py     # 设备码 + 免费游戏 API
+│   ├── scheduler.py           # APScheduler 定时器
 │   ├── credential_store.py    # Fernet 加密
-│   ├── storage.py             # 结果持久化
+│   ├── storage.py             # 历史持久化
 │   ├── result.py              # 数据模型
 │   ├── config.py              # 环境变量
 │   └── static/
@@ -160,21 +197,35 @@ epicgames/
 └── README-zh-CN.md
 ```
 
+---
+
+## 🐛 故障排查
+
+**设备码授权持续失败** — 打开 Web UI 的"🛠 调试选项"面板，测试按钮会打印实际 Epic API 响应。
+
+**容器重启后 `Master key 不匹配`**：
+```bash
+rm ./data/device_auth.enc
+# Web UI 重新授权
+```
+
+**`/store/purchase` 返回 `HTTP 403`** — 这是预期的，Epic 需要浏览器 session cookie，我们伪造不了。点击生成的 checkout URL（一键即可）。
+
+---
+
 ## 🙏 致谢与灵感来源
 
-本项目站在巨人的肩膀上，特别感谢：
+- **[claabs/epicgames-freegames-node](https://github.com/claabs/epicgames-freegames-node)** — "用 Device Code OAuth + 生成 checkout URL"思路的原始项目；本项目是该思路的 Python 重实现。
+- **[MixV2/EpicResearch](https://github.com/MixV2/EpicResearch)** — Epic API 详尽逆向文档。
+- **[xMistt/rebootpy](https://github.com/xMistt/rebootpy)** — Python 实现的 User-Agent + auth header 参考。
+- **[Heroic-Games-Launcher/legendary](https://github.com/Heroic-Games-Launcher/legendary)** — `library-service` API 端点结构参考。
+- **[LeleDerGrasshalmi/FortniteEndpointsDocumentation](https://github.com/LeleDerGrasshalmi/FortniteEndpointsDocumentation)** — 社区维护的端点文档。
 
-- **[claabs/epicgames-freegames-node](https://github.com/claabs/epicgames-freegames-node)** — 使用 Epic **Device Code OAuth 流程**代替账号密码登录的原始灵感。OAuth 的两步走流程（client_credentials → device_code）直接借鉴了他们的实现。
-- **[MixV2/EpicResearch](https://github.com/MixV2/EpicResearch)** — Epic 非公开 API 的详尽逆向工程文档。OAuth client 列表、grant type 规范、endpoint URL 都来源于这份研究。
-- **[xMistt/rebootpy](https://github.com/xMistt/rebootpy)** — Python Epic Games 库。提供了正确的 User-Agent header 和 account_service endpoint 格式参考。
-- **[FortniteEndpointsDocumentation](https://github.com/LeleDerGrasshalmi/FortniteEndpointsDocumentation)** — 社区维护的 endpoint 文档。
-
-如果你 fork 或基于本项目开发，请保留对原作者的致谢。
+---
 
 ## ⚠️ 免责声明
 
-- 本项目仅供学习交流，请遵守 [Epic Games 服务条款](https://www.epicgames.com/site/en-US/terms-of-service)
-- 作者不对账号被封、数据丢失等任何损失负责
+本项目仅供学习交流，请遵守 [Epic Games 服务条款](https://www.epicgames.com/site/en-US/terms-of-service)。作者不对账号被封、数据丢失等任何损失负责。
 
 ## 📝 License
 

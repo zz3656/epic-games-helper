@@ -58,7 +58,7 @@ async def lifespan(app: FastAPI):
                     "已启用" if auto_claim_default else "未启用")
     else:
         logger.info("未配置 device auth，需先通过 Web 端完成 Epic 设备码授权")
-    logger.info("Epic Games 自动领取服务已启动")
+    logger.info("Epic Games 免费游戏助手服务已启动")
     yield
     # 关闭
     scheduler.shutdown()
@@ -66,8 +66,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Epic Games 自动领取",
-    description="通过 Epic 设备码授权 + HTTP API 自动领取每周免费游戏",
+    title="Epic Games 免费游戏助手",
+    description="Epic Games 周免游戏跟踪 · 一键领取跳转 · 设备码授权",
     version="3.0.0",
     lifespan=lifespan,
 )

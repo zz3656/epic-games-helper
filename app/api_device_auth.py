@@ -104,7 +104,7 @@ async def poll_device_auth(device_code: str):
                 logger.info("Device auth 保存成功: account_id=%s", credentials.account_id)
                 return JSONResponse(content={
                     "status": "success",
-                    "message": "Epic 登录授权成功！之后每周自动领取无需重新登录",
+                    "message": "Epic 登录授权成功！之后每周自动跟踪游戏领取状态",
                     "account_id": credentials.account_id,
                 })
             else:

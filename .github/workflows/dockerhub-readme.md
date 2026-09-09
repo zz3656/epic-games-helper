@@ -1,44 +1,71 @@
-# 🎮 Epic Games 自动领取
+# 🎮 Epic Games Free Games Helper
 
-> 每周自动领取 Epic Games 免费游戏。**设备码授权** · 零浏览器 · 零验证码 · 容器 ~150MB。
+> Track Epic Games weekly free games · identify already-owned titles · one-click checkout.
+> **设备码授权** · 零浏览器 · 零验证码 · 容器 ~150MB。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docker](https://img.shields.io/badge/Docker-ready-blue.svg)](https://www.docker.com/)
-[![Docker Pulls](https://img.shields.io/docker/pulls/zz3656/epic-games-claimer.svg?style=flat)](https://hub.docker.com/r/zz3656/epic-games-claimer)
-[![Multi-arch](https://img.shields.io/badge/arch-amd64%20%7C%20arm64-lightgrey.svg)](https://hub.docker.com/r/zz3656/epic-games-claimer)
+[![Docker Pulls](https://img.shields.io/docker/pulls/zz3656/epic-games-helper.svg?style=flat)](https://hub.docker.com/r/zz3656/epic-games-helper)
+[![Multi-arch](https://img.shields.io/badge/arch-amd64%20%7C%20arm64-lightgrey.svg)](https://hub.docker.com/r/zz3656/epic-games-helper)
 
 ---
 
-## ✨ 单一认证方式：**设备码授权**
+## ⚠️ Important: This is a *helper*, not a full auto-claimer
 
-- ⚡ 一次授权永久使用
-- 🚫 零 hCaptcha / 零自动化检测
-- 📦 容器体积仅 ~150MB（无 Chromium）
-- 🛡️ 服务器 IP 不会被 Epic 风控
-- ♾️ Token 永不过期（除非手动撤销）
+Epic Games' purchase endpoints require browser session cookies (XSRF, hCaptcha, etc.)
+that **cannot** be forged via API. This tool therefore:
+
+- ✅ Tracks the weekly free-games list
+- ✅ Cross-references with your library (marks already-owned)
+- ✅ Generates a **one-click checkout URL** per game
+- 🚧 **Cannot** POST `/store/purchase` end-to-end (planned, see roadmap below)
+
+For most users, one click is good enough. For everyone else: roadmap below.
 
 ---
 
-## 🚀 快速开始
+## ✨ Features
+
+### ✅ Implemented
+
+- 🔑 **Device Code OAuth** — one-time browser login → permanent token (no password, no hCaptcha)
+- 🗓️ **Weekly free-game tracker** — auto-fetched from `freeGamesPromotions`
+- 📚 **Library cross-check** — marks already-owned via `library-service` API
+- 🖼️ **Rich game cards** — cover, title, dates, original price, "end in N days"
+- 🎯 **One-click checkout URL** per game
+- ⏰ **Scheduled weekly check** via APScheduler
+- 🔌 **REST API** with Swagger UI at `/docs`
+- 🛡️ **Fernet-encrypted token storage** (AES-128-CBC + HMAC), `0600` permissions
+- 🐳 **Multi-arch** image: `linux/amd64` + `linux/arm64`
+
+### 🚧 Roadmap (in priority order)
+
+- 🎮 **True auto-claim** — investigate TrustedServer policy / GQL mutations / headless Chromium fallback to POST `/store/purchase` for real
+- 👥 **Multi-account support** — redesign credential store for N accounts
+- 📲 **Push notifications** — Telegram / email / webhook the moment a new drop goes live
+- 🌍 **Per-region support** — currently hard-coded `zh-CN/CN`
+
+---
+
+## 🚀 Quick Start
 
 ```bash
 docker run -d \
-  --name epic-claimer \
+  --name epic-helper \
   -p 8000:8000 \
   -v $(pwd)/data:/app/data \
   --restart unless-stopped \
-  zz3656/epic-games-claimer:latest
+  zz3656/epic-games-helper:latest
 ```
 
-打开 **http://localhost:8000**
+Then open **http://localhost:8000** and:
 
-1. 进入 "🎯 Epic 设备码登录" 区块
-2. 点击 "🔑 Epic 设备码授权"
-3. 复制 `user_code`，点击链接跳转 Epic 官方授权页
-4. 在自己浏览器登录 Epic 账号并授权设备
-5. 完成后 Web UI 自动保存 token
+1. Click **"🔑 Epic 设备码授权"**
+2. Copy the `user_code`, click the Epic auth link
+3. Log into Epic in your own browser and approve the device
+4. UI auto-detects success → token saved
 
-之后每周自动领取，无需任何操作。
+Weekly drops are now tracked automatically.
 
 ---
 
@@ -46,9 +73,9 @@ docker run -d \
 
 ```yaml
 services:
-  epic-claimer:
-    image: zz3656/epic-games-claimer:latest
-    container_name: epic-games-claimer
+  epic-helper:
+    image: zz3656/epic-games-helper:latest
+    container_name: epic-games-helper
     restart: unless-stopped
     ports:
       - "8000:8000"
@@ -61,63 +88,68 @@ services:
       - ./data:/app/data
     security_opt:
       - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
 ```
 
 ---
 
-## 🔐 隐私与安全
+## ⚙️ Environment Variables
 
-| 存储 | 加密 | 文件 |
-|---|---|---|
-| Device Auth Token | Fernet (AES-128-CBC) | `/app/data/device_auth.enc` (0600) |
-| Master key | 明文 | `/app/data/.env` (0600) |
-
-**只存储 token，不存储密码。**
-
----
-
-## ⚙️ 环境变量
-
-| 变量 | 默认 | 说明 |
-|---|---|---|
-| `EPIC_MASTER_KEY` | *自动生成* | Fernet 密钥 |
-| `TZ` | `Asia/Shanghai` | 时区 |
-| `SCHEDULE_DAY` | `thu` | 触发日（mon-sun） |
-| `SCHEDULE_HOUR` | `17` | 触发小时 |
-| `SCHEDULE_MINUTE` | `0` | 触发分钟 |
-| `LOG_LEVEL` | `INFO` | 日志级别 |
-| `AUTO_CLAIM_ENABLED` | `false` | 启动时自动开启自动领取 |
+| Var | Default | Description |
+|-----|---------|-------------|
+| `EPIC_MASTER_KEY` | *auto-generated* | Fernet key (set explicitly to persist tokens across container recreations) |
+| `TZ` | `Asia/Shanghai` | Timezone for scheduler |
+| `SCHEDULE_DAY` | `thu` | Trigger day (`mon`–`sun`) |
+| `SCHEDULE_HOUR` | `17` | Trigger hour |
+| `SCHEDULE_MINUTE` | `0` | Trigger minute |
+| `LOG_LEVEL` | `INFO` | Log level |
+| `AUTO_CLAIM_ENABLED` | `false` | Auto-enable on boot |
 
 ---
 
-## 🛣️ 多架构支持
+## 🔐 Security
 
-| 架构 | 支持 |
-|---|---|
+- Device Auth Token: Fernet (AES-128-CBC + HMAC), file mode `0600`
+- Master key: stored in `.env`, file mode `0600`
+- **No password ever stored.**
+
+---
+
+## 🛣️ Multi-arch
+
+| Arch | Supported |
+|------|-----------|
 | linux/amd64 | ✅ |
 | linux/arm64 | ✅ |
 
-群晖、威联通、Unraid 等 ARM 设备也能跑。
+Synology, QNAP, Unraid, Raspberry Pi 4+ all work.
 
 ---
 
-## 🐛 故障排查
+## 🐛 Troubleshooting
 
-**设备码授权失败** — 在 Web UI "🛠 调试选项" 板块点击测试按钮，输出会显示 Epic API 的实际错误。
+**Authorization keeps failing** — open the "🛠 Debug" panel in the Web UI; test buttons print the actual Epic API response.
 
-**Master key 不匹配**：
+**`Master key mismatch` after container restart**:
 ```bash
 rm ./data/device_auth.enc
-# Web 界面重新授权
+# Re-authorize via Web UI
 ```
+
+**`HTTP 403` on `/store/purchase`** — expected. Epic needs browser session cookies we can't forge. Use the generated checkout URL (one click).
 
 ---
 
 ## 🙏 Credits
 
-- [claabs/epicgames-freegames-node](https://github.com/claabs/epicgames-freegames-node) — Original inspiration for the **Device Code OAuth flow**
-- [MixV2/EpicResearch](https://github.com/MixV2/EpicResearch) — Comprehensive Epic API documentation
-- [xMistt/rebootpy](https://github.com/xMistt/rebootpy) — Python Epic library & auth headers
+- [claabs/epicgames-freegames-node](https://github.com/claabs/epicgames-freegames-node) — Device Code OAuth + checkout URL approach
+- [MixV2/EpicResearch](https://github.com/MixV2/EpicResearch) — Epic API documentation
+- [xMistt/rebootpy](https://github.com/xMistt/rebootpy) — Python auth headers reference
+- [Heroic-Games-Launcher/legendary](https://github.com/Heroic-Games-Launcher/legendary) — `library-service` endpoint shape
 
 ## 📜 License
 
@@ -125,5 +157,5 @@ MIT
 
 ---
 
-> GitHub: [zz3656/epic-games-claimer](https://github.com/zz3656/epic-games-claimer)
-> Docker Hub: [zz3656/epic-games-claimer](https://hub.docker.com/r/zz3656/epic-games-claimer)
+> GitHub: [zz3656/epic-games-helper](https://github.com/zz3656/epic-games-helper)
+> Docker Hub: [zz3656/epic-games-helper](https://hub.docker.com/r/zz3656/epic-games-helper)
