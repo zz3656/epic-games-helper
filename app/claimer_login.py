@@ -188,6 +188,8 @@ class LoginHandler:
             await page.goto(
                 self.parent.LOGIN_URL, wait_until="domcontentloaded", timeout=60000
             )
+            # 模拟真实用户访问页面的等待时间
+            await asyncio.sleep(2)
         except PWTimeout:
             logger.error("访问登录页超时")
             return LoginResult(

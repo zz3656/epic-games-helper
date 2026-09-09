@@ -195,50 +195,217 @@ class EpicClaimer:
             if progress_fn:
                 await _emit(progress_fn, "正在启动浏览器…", "active")
 
+            # 真实化浏览器指纹：使用最新的 Chrome 141 + Windows 11 UA
+            # 避免使用 macOS UA 与服务器 Linux 环境不一致
+            # 关键：UA、Platform、sec-ch-* 头需要一致
             context = await self._browser.new_context(
                 viewport={"width": 1440, "height": 900},
+                screen={"width": 1440, "height": 900},
                 user_agent=(
-                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                     "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/120.0.0.0 Safari/537.36"
+                    "Chrome/141.0.0.0 Safari/537.36"
                 ),
                 locale="zh-CN",
+                timezone_id="Asia/Shanghai",
+                extra_http_headers={
+                    "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
+                    "sec-ch-ua": '"Chromium";v="141", "Not_A Brand";v="24", "Google Chrome";v="141"',
+                    "sec-ch-ua-mobile": "?0",
+                    "sec-ch-ua-platform": '"Windows"',
+                    "sec-fetch-dest": "document",
+                    "sec-fetch-mode": "navigate",
+                    "sec-fetch-site": "none",
+                    "sec-fetch-user": "?1",
+                    "upgrade-insecure-requests": "1",
+                },
+                permissions=["geolocation"],
+                color_scheme="light",
+                device_scale_factor=1,
+                is_mobile=False,
+                has_touch=False,
             )
             # 注入 stealth 脚本：避免被 hCaptcha/Epic 检测为机器人
+            # 基于 puppeteer-extra-plugin-stealth 思路，实现以下反检测项：
+            # 1. navigator.webdriver 隐藏
+            # 2. chrome runtime 伪装
+            # 3. playwright 全局变量清理
+            # 4. plugins/mimeTypes 伪装
+            # 5. languages 伪装
+            # 6. permissions.query 伪装
+            # 7. WebGL vendor/renderer 伪装
+            # 8. iframe contentWindow 伪装
+            # 9. Notification 伪装
+            # 10. hairline / 触控点伪装
+            # 11. CDP 检测的 Runtime.enable 痕迹
+            # 12. 启用 console.log 避免被沙箱检测
             await context.add_init_script("""
-                // 隐藏 navigator.webdriver
-                Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-                // 伪装 chrome runtime
-                window.chrome = { runtime: {}, loadTimes: () => ({}), csi: () => ({}) };
-                // 删除 Playwright 注入的全局变量
-                try { delete window.__playwright; } catch (e) {}
-                try { delete window.__pwInitScripts; } catch (e) {}
-                try { delete window.__pwScripts; } catch (e) {}
-                // 伪装 plugins
-                Object.defineProperty(navigator, 'plugins', {
-                    get: () => [1, 2, 3, 4, 5],
-                });
-                // 伪装 languages
-                Object.defineProperty(navigator, 'languages', {
-                    get: () => ['zh-CN', 'zh', 'en-US', 'en'],
-                });
-                // 隐藏 permissions query
-                try {
-                    const originalQuery = window.navigator.permissions.query;
-                    window.navigator.permissions.query = (parameters) =>
-                        parameters.name === 'notifications' ?
-                        Promise.resolve({ state: Notification.permission }) :
-                        originalQuery(parameters);
-                } catch (e) {}
-                // 伪装 WebGL vendor/renderer
-                try {
-                    const getParameter = WebGLRenderingContext.prototype.getParameter;
-                    WebGLRenderingContext.prototype.getParameter = function(parameter) {
-                        if (parameter === 37445) return 'Intel Inc.';
-                        if (parameter === 37446) return 'Intel Iris OpenGL Engine';
-                        return getParameter.call(this, parameter);
+                (function() {
+                    'use strict';
+                    const _origQuery = window.navigator.permissions && window.navigator.permissions.query;
+
+                    // 1. navigator.webdriver
+                    Object.defineProperty(navigator, 'webdriver', { get: () => undefined, configurable: true });
+
+                    // 2. chrome runtime
+                    if (!window.chrome) {
+                        window.chrome = { runtime: {}, loadTimes: () => ({}), csi: () => ({}), app: { isInstalled: false } };
+                    } else {
+                        if (!window.chrome.runtime) window.chrome.runtime = {};
+                        if (!window.chrome.loadTimes) window.chrome.loadTimes = () => ({});
+                        if (!window.chrome.csi) window.chrome.csi = () => ({});
+                    }
+
+                    // 3. 删除 Playwright 注入的全局变量
+                    try { delete window.__playwright; } catch (e) {}
+                    try { delete window.__pwInitScripts; } catch (e) {}
+                    try { delete window.__pwScripts; } catch (e) {}
+                    try { delete window.__pw_manual__; } catch (e) {}
+
+                    // 4. plugins / mimeTypes
+                    Object.defineProperty(navigator, 'plugins', {
+                        get: () => {
+                            const arr = [
+                                { name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer', description: 'Portable Document Format' },
+                                { name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai', description: '' },
+                                { name: 'Native Client', filename: 'internal-nacl-plugin', description: '' },
+                            ];
+                            arr.item = (i) => arr[i];
+                            arr.namedItem = (n) => arr.find(p => p.name === n);
+                            arr.refresh = () => {};
+                            return arr;
+                        },
+                        configurable: true,
+                    });
+                    Object.defineProperty(navigator, 'mimeTypes', {
+                        get: () => {
+                            const arr = [
+                                { type: 'application/pdf', suffixes: 'pdf', description: '', enabledPlugin: { name: 'Chrome PDF Plugin' } },
+                            ];
+                            arr.item = (i) => arr[i];
+                            arr.namedItem = (n) => arr.find(p => p.type === n);
+                            return arr;
+                        },
+                        configurable: true,
+                    });
+
+                    // 5. languages
+                    Object.defineProperty(navigator, 'languages', { get: () => ['zh-CN', 'zh', 'en-US', 'en'], configurable: true });
+                    Object.defineProperty(navigator, 'language', { get: () => 'zh-CN', configurable: true });
+
+                    // 6. permissions.query
+                    if (_origQuery) {
+                        window.navigator.permissions.query = (parameters) =>
+                            parameters.name === 'notifications' ?
+                            Promise.resolve({ state: Notification.permission }) :
+                            _origQuery(parameters);
+                    }
+
+                    // 7. WebGL vendor/renderer
+                    const modifyParameter = (ctx) => {
+                        const origGetParameter = ctx.getParameter;
+                        ctx.getParameter = function(parameter) {
+                            if (parameter === 37445) return 'Intel Inc.';
+                            if (parameter === 37446) return 'Intel Iris OpenGL Engine';
+                            if (parameter === 37447) return 'WebKit';
+                            return origGetParameter.call(this, parameter);
+                        };
+                        const origGetExtension = ctx.getExtension;
+                        ctx.getExtension = function(name) { return null; };
                     };
-                } catch (e) {}
+                    try { modifyParameter(WebGLRenderingContext.prototype); } catch (e) {}
+                    try { modifyParameter(WebGL2RenderingContext.prototype); } catch (e) {}
+
+                    // 8. iframe contentWindow
+                    try {
+                        const elementDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight');
+                        Object.defineProperty(HTMLDivElement.prototype, 'offsetHeight', { ...elementDescriptor, get: function() { return 1; } });
+                    } catch (e) {}
+
+                    // 9. Notification
+                    try {
+                        Object.defineProperty(Notification, 'permission', { get: () => 'default', configurable: true });
+                    } catch (e) {}
+
+                    // 10. hairline / 触控点
+                    try {
+                        Object.defineProperty(navigator, 'maxTouchPoints', { get: () => 0, configurable: true });
+                    } catch (e) {}
+
+                    // 11. 隐藏 CDP/Runtime.evaluate 痕迹
+                    try {
+                        const origError = console.error;
+                        console.error = function(...args) {
+                            const s = args.join(' ');
+                            if (s.includes('Protocol Error') || s.includes('Session closed')) return;
+                            return origError.apply(this, args);
+                        };
+                    } catch (e) {}
+
+                    // 12. 添加 Connection API
+                    try {
+                        Object.defineProperty(navigator, 'connection', {
+                            get: () => ({
+                                effectiveType: '4g', rtt: 50, downlink: 10, saveData: false,
+                            }),
+                            configurable: true,
+                        });
+                    } catch (e) {}
+
+                    // 13. 隐藏自动化特征 - 误判检测
+                    try {
+                        const origToString = Function.prototype.toString;
+                        Function.prototype.toString = function() {
+                            if (this === navigator.permissions.query) {
+                                return 'function query() { [native code] }';
+                            }
+                            return origToString.call(this);
+                        };
+                    } catch (e) {}
+
+                    // 14. 隐藏 iframe 中可能的 hCaptcha 检测
+                    try {
+                        if (window.top !== window.self) {
+                            Object.defineProperty(window, 'top', { get: () => window.self });
+                        }
+                    } catch (e) {}
+
+                    // 15. 伪装 navigator.platform（与 UA 一致）
+                    try {
+                        Object.defineProperty(navigator, 'platform', { get: () => 'Win32', configurable: true });
+                        Object.defineProperty(navigator, 'oscpu', { get: () => 'Windows NT 10.0; Win64; x64', configurable: true });
+                    } catch (e) {}
+
+                    // 16. 伪装 hardwareConcurrency / deviceMemory
+                    try {
+                        Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8, configurable: true });
+                        Object.defineProperty(navigator, 'deviceMemory', { get: () => 8, configurable: true });
+                    } catch (e) {}
+
+                    // 17. 隐藏 headless 痕迹
+                    try {
+                        // 解决 hCaptcha 检查 navigator.webdriver 以外的 API
+                        if (window.outerWidth === 0 && window.outerHeight === 0) {
+                            Object.defineProperty(window, 'outerWidth', { get: () => window.innerWidth });
+                            Object.defineProperty(window, 'outerHeight', { get: () => window.innerHeight });
+                        }
+                    } catch (e) {}
+
+                    // 18. 修复 Permissions API 签名
+                    try {
+                        const origToString = Function.prototype.toString;
+                        const _funcToString = origToString.bind(Function.prototype.toString);
+                        const _originalPermissionsQuery = navigator.permissions.__proto__.query;
+                        navigator.permissions.__proto__.query = function(...args) {
+                            const result = _originalPermissionsQuery.apply(this, args);
+                            // 返回原始 Promise 不要被检测
+                            return result;
+                        };
+                        navigator.permissions.__proto__.query.toString = function() {
+                            return 'function query() { [native code] }';
+                        };
+                    } catch (e) {}
+                })();
             """)
             page = await context.new_page()
 
