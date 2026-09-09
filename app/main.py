@@ -142,7 +142,7 @@ async def index(request: Request):
     )
 
 
-@app.get("/vnc", response_class=HTMLResponse)
+@app.get("/vnc-viewer", response_class=HTMLResponse)
 async def vnc_page(request: Request):
     """嵌入式 VNC 页面（不需要单独的端口）
 

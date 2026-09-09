@@ -216,7 +216,7 @@ function showClaimResult(box, data) {
                     "⚠ noVNC 黑屏是正常的：只有当领取任务运行时会看到 Chrome，请先点击「开始领取」",
                     "完成后领取任务会自动继续（等待最多 120 秒）",
                 ],
-                vncLink: data.vnc_enabled ? (window.location.protocol + "//" + window.location.host + "/vnc") : null,
+                vncLink: data.vnc_enabled ? (window.location.protocol + "//" + window.location.host + "/vnc-viewer") : null,
             },
             network_error: {
                 icon: "📡",
