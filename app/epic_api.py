@@ -553,27 +553,47 @@ class EpicAPIClient:
 
     async def fetch_free_games_with_status(
         self, credentials: Optional[DeviceAuthCredentials] = None,
-    ) -> List[FreeGame]:
+    ) -> Tuple[List[FreeGame], Dict[str, Any]]:
         """获取本周免费游戏 + 检查用户是否已拥有 + 生成领取链接
 
         Args:
             credentials: device auth credentials（如未提供则不检查是否已拥有）
 
         Returns:
-            List[FreeGame] with already_owned, checkout_url filled
+            (games, diagnostics) — games 列表和诊断信息
+            diagnostics 字段：
+            - free_games_fetch_ok: 是否成功拉取免费游戏列表
+            - library_fetch_ok: 是否成功拉取用户库
+            - library_fetch_error: 错误详情（如有）
+            - games_count: 拉取到的游戏数
         """
+        diagnostics: Dict[str, Any] = {
+            "free_games_fetch_ok": False,
+            "library_fetch_ok": False,
+            "library_fetch_error": "",
+            "games_count": 0,
+        }
+
         # 1. 获取本周免费游戏
         games = await self.fetch_free_games()
+        diagnostics["free_games_fetch_ok"] = True
+        diagnostics["games_count"] = len(games)
+
         if not games:
-            return []
+            return [], diagnostics
 
         # 2. 查询用户已拥有的 entitlements
         user_entitlements = set()
         if credentials:
             try:
                 user_entitlements = await self.fetch_user_entitlements(credentials)
+                diagnostics["library_fetch_ok"] = True
             except Exception as e:
-                logger.warning("查询 entitlements 失败，继续返回未标记状态: %s", e)
+                logger.warning("查询 entitlements 失败: %s", e)
+                diagnostics["library_fetch_error"] = f"{type(e).__name__}: {e}"
+        else:
+            diagnostics["library_fetch_ok"] = False
+            diagnostics["library_fetch_error"] = "未提供 credentials"
 
         # 3. 标记每款游戏
         for game in games:
@@ -587,7 +607,7 @@ class EpicAPIClient:
             # 生成领取链接
             game.checkout_url = self._build_checkout_url(game)
 
-        return games
+        return games, diagnostics
 
     # ============================================
     # 领取游戏

@@ -368,97 +368,216 @@ function daysUntilEnd(endIso) {
 async function loadAccountGames() {
     if (!accountGamesGrid) return;
     accountGamesHint.textContent = "加载中…";
+
+    // 第一步：检查账号可用性
+    let accountInfo;
     try {
-        // 第一步：检查账号可用性
         const accountResp = await fetch("/api/device-auth/account-info");
-        const accountInfo = await accountResp.json();
-
-        if (!accountInfo.configured) {
-            accountGamesGrid.innerHTML = `<div class="empty-state">❌ 未配置设备码授权</div>`;
-            accountGamesHint.textContent = "未授权";
-            return;
-        }
-
-        // 第二步：拉取免费游戏
-        const resp = await fetch("/api/free-games");
-        const data = await resp.json();
-
-        if (!data.success) {
-            const errMsg = data.error || "未知错误";
-            accountGamesGrid.innerHTML = `<div class="empty-state">
-                ❌ 加载失败<br>
-                <span style="font-size:12px; color:#fbbf24;">${escapeHtml(errMsg)}</span><br>
-                <span style="font-size:11px; color:#94a3b8;">账号: ${escapeHtml(accountInfo.account_id)} · ${accountInfo.library_api_accessible ? "账号可用" : "⚠️ 账号不可用"}</span>
-            </div>`;
-            accountGamesHint.textContent = "加载失败";
-            console.error("free-games API 返回失败:", data, "账号状态:", accountInfo);
-            return;
-        }
-
-        const games = data.games || [];
-        const ownedGames = games.filter(g => g.already_owned);
-        const claimableGames = games.filter(g => !g.already_owned);
-
-        if (games.length === 0) {
-            accountGamesGrid.innerHTML = `<div class="empty-state">📭 本周暂无免费游戏</div>`;
-            accountGamesHint.textContent = "本周暂无免费游戏";
-            return;
-        }
-
-        // 账号可用性提示
-        const accountHint = accountInfo.library_api_accessible
-            ? `账号 ${escapeHtml(accountInfo.account_id)} 已验证可用 · `
-            : `⚠️ 账号 ${escapeHtml(accountInfo.account_id)} token 可能已失效（已拥有状态可能不准） · `;
-        accountGamesHint.textContent = accountHint + `本周 ${claimableGames.length} 款可领取 · ${ownedGames.length} 款已拥有`;
-
-        accountGamesGrid.innerHTML = games.map(g => {
-            const owned = g.already_owned;
-            const daysLeft = daysUntilEnd(g.end_date);
-            const datesHtml = g.start_date || g.end_date
-                ? `<div class="game-dates">
-                       🆓 <span class="free">${escapeHtml(formatDates(g.start_date, g.end_date))}</span>
-                       ${daysLeft !== null && daysLeft > 0 && daysLeft <= 3
-                           ? ` <span class="end-soon">仅剩 ${daysLeft} 天</span>` : ""}
-                   </div>`
-                : "";
-            const priceHtml = g.original_price
-                ? `<div class="game-price"><span class="original">${escapeHtml(g.original_price)}</span> <span class="free">免费</span></div>`
-                : `<div class="game-price"><span class="free">🆓 免费领取</span></div>`;
-
-            const cover = g.image_url
-                ? `<img class="game-cover" src="${escapeHtml(g.image_url)}" alt="${escapeHtml(g.title)}" loading="lazy" onerror="this.outerHTML='<div class=&quot;game-cover-placeholder&quot;>🎮</div>'">`
-                : `<div class="game-cover-placeholder">🎮</div>`;
-
-            const badge = owned
-                ? `<span class="game-status-badge owned">已拥有</span>`
-                : `<span class="game-status-badge free">可领取</span>`;
-
-            const actionBtn = owned
-                ? `<button class="btn-claim-card owned" disabled>✅ 已拥有</button>`
-                : `<a class="btn-claim-card" href="${escapeHtml(g.checkout_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">领取</a>`;
-
-            return `
-                <div class="game-card ${owned ? "owned" : ""}" data-offer-id="${escapeHtml(g.offer_id)}">
-                    ${cover}
-                    <div class="game-info">
-                        <h3 class="game-title">${escapeHtml(g.title)} ${badge}</h3>
-                        ${datesHtml}
-                        ${priceHtml}
-                        ${g.description ? `<div class="game-description">${escapeHtml(g.description)}</div>` : ""}
-                        <div class="game-actions">${actionBtn}</div>
-                    </div>
-                </div>
-            `;
-        }).join("");
+        accountInfo = await accountResp.json();
+        console.log("账号状态:", accountInfo);
     } catch (err) {
-        console.error("加载账号游戏库失败:", err);
-        accountGamesHint.textContent = "加载失败";
+        console.error("account-info API 异常:", err);
         accountGamesGrid.innerHTML = `<div class="empty-state">
-            ❌ 加载失败<br>
+            ❌ 账号状态查询失败<br>
             <span style="font-size:12px; color:#fbbf24;">${escapeHtml(String(err.message || err))}</span><br>
-            <span style="font-size:11px; color:#94a3b8;">请查看浏览器 Console 获取详细信息</span>
+            <span style="font-size:11px; color:#94a3b8;">请检查后端服务是否运行</span>
+        </div>`;
+        accountGamesHint.textContent = "账号查询失败";
+        return;
+    }
+
+    // 显示账号状态卡片
+    const accountStatusHtml = renderAccountStatusCard(accountInfo);
+    accountGamesGrid.innerHTML = accountStatusHtml;
+
+    if (!accountInfo.configured) {
+        accountGamesHint.textContent = "未授权，请先完成设备码登录";
+        return;
+    }
+
+    // 第二步：拉取免费游戏
+    let data;
+    try {
+        const resp = await fetch("/api/free-games");
+        data = await resp.json();
+        console.log("free-games API 返回:", data);
+    } catch (err) {
+        console.error("free-games API 异常:", err);
+        accountGamesHint.textContent = "游戏列表请求失败";
+        const errMsg = String(err.message || err);
+        // 在现有卡片下方追加错误信息
+        accountGamesGrid.innerHTML += `<div class="empty-state" style="margin-top:12px;">
+            ❌ 游戏列表请求失败<br>
+            <span style="font-size:12px; color:#fbbf24;">${escapeHtml(errMsg)}</span>
+        </div>`;
+        return;
+    }
+
+    if (!data.success) {
+        accountGamesHint.textContent = "加载失败";
+        const errMsg = data.error || "未知错误";
+        accountGamesGrid.innerHTML += `<div class="empty-state" style="margin-top:12px;">
+            ❌ free-games API 返回失败<br>
+            <span style="font-size:12px; color:#fbbf24;">${escapeHtml(errMsg)}</span><br>
+            <span style="font-size:11px; color:#94a3b8;">账号: ${escapeHtml(accountInfo.account_id)} · ${accountInfo.library_api_accessible ? "账号可用" : "⚠️ 账号不可用"}</span>
+        </div>`;
+        return;
+    }
+
+    const games = data.games || [];
+
+    // 显示诊断信息（如有）
+    if (data.diagnostics) {
+        const diag = data.diagnostics;
+        const diagParts = [];
+        if (diag.games_count !== undefined) diagParts.push(`返回 ${diag.games_count} 款游戏`);
+        if (diag.library_fetch_ok === false) {
+            diagParts.push(`⚠️ 库查询失败：${escapeHtml(diag.library_fetch_error || "未知错误")}`);
+        } else if (diag.library_fetch_ok === true) {
+            diagParts.push("库查询成功");
+        }
+        if (diagParts.length > 0) {
+            console.log("free-games diagnostics:", diag);
+            accountGamesGrid.innerHTML += `<div style="margin-top:10px; padding:8px 10px; background:rgba(96,165,250,0.1); border-left:3px solid #60a5fa; border-radius:4px; font-size:12px; color:#94a3b8;">
+                🔍 ${diagParts.join(" · ")}
+            </div>`;
+        }
+    }
+    const ownedGames = games.filter(g => g.already_owned);
+    const claimableGames = games.filter(g => !g.already_owned);
+
+    // 账号可用性提示
+    const accountHint = accountInfo.library_api_accessible
+        ? `账号 ${escapeHtml(accountInfo.account_id)} 已验证可用 · `
+        : `⚠️ 账号 ${escapeHtml(accountInfo.account_id)} token 可能已失效（已拥有状态可能不准） · `;
+    accountGamesHint.textContent = accountHint + `本周 ${claimableGames.length} 款可领取 · ${ownedGames.length} 款已拥有`;
+
+    if (games.length === 0) {
+        accountGamesGrid.innerHTML += `<div class="empty-state" style="margin-top:12px;">📭 本周暂无免费游戏</div>`;
+        return;
+    }
+
+    // 在账号状态卡片下方渲染游戏卡片
+    const gamesHtml = games.map(g => {
+        const owned = g.already_owned;
+        const daysLeft = daysUntilEnd(g.end_date);
+        const datesHtml = g.start_date || g.end_date
+            ? `<div class="game-dates">
+                   🆓 <span class="free">${escapeHtml(formatDates(g.start_date, g.end_date))}</span>
+                   ${daysLeft !== null && daysLeft > 0 && daysLeft <= 3
+                       ? ` <span class="end-soon">仅剩 ${daysLeft} 天</span>` : ""}
+               </div>`
+            : "";
+        const priceHtml = g.original_price
+            ? `<div class="game-price"><span class="original">${escapeHtml(g.original_price)}</span> <span class="free">免费</span></div>`
+            : `<div class="game-price"><span class="free">🆓 免费领取</span></div>`;
+
+        const cover = g.image_url
+            ? `<img class="game-cover" src="${escapeHtml(g.image_url)}" alt="${escapeHtml(g.title)}" loading="lazy" onerror="this.outerHTML='<div class=&quot;game-cover-placeholder&quot;>🎮</div>'">`
+            : `<div class="game-cover-placeholder">🎮</div>`;
+
+        const badge = owned
+            ? `<span class="game-status-badge owned">已拥有</span>`
+            : `<span class="game-status-badge free">可领取</span>`;
+
+        const actionBtn = owned
+            ? `<button class="btn-claim-card owned" disabled>✅ 已拥有</button>`
+            : `<a class="btn-claim-card" href="${escapeHtml(g.checkout_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">领取</a>`;
+
+        return `
+            <div class="game-card ${owned ? "owned" : ""}" data-offer-id="${escapeHtml(g.offer_id)}">
+                ${cover}
+                <div class="game-info">
+                    <h3 class="game-title">${escapeHtml(g.title)} ${badge}</h3>
+                    ${datesHtml}
+                    ${priceHtml}
+                    ${g.description ? `<div class="game-description">${escapeHtml(g.description)}</div>` : ""}
+                    <div class="game-actions">${actionBtn}</div>
+                </div>
+            </div>
+        `;
+    }).join("");
+
+    // 把游戏卡片追加到现有账号状态卡片后面
+    const gamesContainer = document.createElement("div");
+    gamesContainer.style.cssText = "display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:16px; margin-top:16px;";
+    gamesContainer.innerHTML = gamesHtml;
+    accountGamesGrid.appendChild(gamesContainer);
+}
+
+// 渲染账号状态卡片（始终显示，让用户知道账号是否可用）
+function renderAccountStatusCard(info) {
+    if (!info.configured) {
+        return `<div class="empty-state" style="background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3);">
+            ❌ 未配置设备码授权<br>
+            <span style="font-size:12px; color:#94a3b8;">请先完成 Epic 设备码登录</span>
         </div>`;
     }
+
+    const tokenOk = info.access_token_valid;
+    const libOk = info.library_api_accessible;
+    const errorMsg = info.error || "";
+
+    // 总体状态
+    let statusIcon = "✅";
+    let statusText = "账号完全可用";
+    let statusClass = "ok";
+    if (!libOk) {
+        statusIcon = "❌";
+        statusText = "账号不可用";
+        statusClass = "bad";
+    } else if (!tokenOk) {
+        statusIcon = "⚠️";
+        statusText = "账号部分可用（token 过期但 refresh 后恢复了）";
+        statusClass = "warn";
+    }
+
+    const checks = [
+        {
+            name: "device auth 已配置",
+            pass: info.configured,
+            detail: `账号 ID: ${escapeHtml(info.account_id || "未知")}`
+        },
+        {
+            name: "access_token 有效",
+            pass: tokenOk,
+            detail: tokenOk ? "未过期或已成功刷新" : "access_token 已过期"
+        },
+        {
+            name: "library API 可访问",
+            pass: libOk,
+            detail: libOk ? "能查询已拥有游戏" : "无法查询账户库（token 可能无效）"
+        },
+    ];
+
+    const checksHtml = checks.map(c => `
+        <div style="display:flex; align-items:center; gap:8px; padding:4px 0; font-size:13px;">
+            <span style="color:${c.pass ? '#4ade80' : '#fca5a5'}; font-weight:bold;">${c.pass ? '✓' : '✗'}</span>
+            <span style="flex:1;">${escapeHtml(c.name)}</span>
+            <span style="color:#94a3b8; font-size:11px;">${escapeHtml(c.detail)}</span>
+        </div>
+    `).join("");
+
+    return `
+        <div style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:14px;">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+                <span style="font-size:24px;">${statusIcon}</span>
+                <div>
+                    <div style="font-size:15px; font-weight:600;">账号状态：${escapeHtml(statusText)}</div>
+                    <div style="font-size:12px; color:#94a3b8;">${escapeHtml(info.account_id || "未识别")}</div>
+                </div>
+            </div>
+            <div style="border-top:1px solid rgba(255,255,255,0.1); padding-top:10px;">
+                ${checksHtml}
+            </div>
+            ${errorMsg ? `<div style="margin-top:10px; padding:8px 10px; background:rgba(251,191,36,0.1); border-left:3px solid #fbbf24; border-radius:4px; font-size:12px; color:#fbbf24;">
+                ⚠ ${escapeHtml(errorMsg)}
+            </div>` : ""}
+            <div style="margin-top:10px; text-align:right;">
+                <button onclick="loadAccountGames()" style="background:transparent; border:1px solid rgba(255,255,255,0.2); color:#e4e4e7; padding:4px 12px; border-radius:4px; cursor:pointer; font-size:12px;">🔄 重新检查</button>
+            </div>
+        </div>
+    `;
 }
 
 // ============ 调试按钮 ============

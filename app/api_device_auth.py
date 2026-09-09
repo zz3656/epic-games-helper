@@ -454,6 +454,7 @@ async def device_auth_account_info():
         "configured": True,
         "account_id": masked_id,
         "access_token_valid": not credentials.is_expired(),
+        "access_token_expires_in": max(0, int(credentials.expires_at - time.time())) if credentials.expires_at else 0,
         "library_api_accessible": False,
         "error": "",
     }
@@ -524,10 +525,11 @@ async def get_free_games():
     try:
         async with EpicAPIClient() as client:
             logger.info("Fetching free games (credentials=%s)", "yes" if credentials else "no")
-            games = await client.fetch_free_games_with_status(credentials)
-            logger.info("Got %d free games", len(games))
+            games, diagnostics = await client.fetch_free_games_with_status(credentials)
+            logger.info("Got %d free games, diagnostics=%s", len(games), diagnostics)
             return JSONResponse(content={
                 "success": True,
+                "diagnostics": diagnostics,
                 "games": [
                     {
                         "title": g.title,
@@ -549,5 +551,5 @@ async def get_free_games():
         logger.exception("获取免费游戏列表失败")
         return JSONResponse(content={
             "success": False,
-            "error": str(e),
+            "error": f"{type(e).__name__}: {e}",
         }, status_code=500)
