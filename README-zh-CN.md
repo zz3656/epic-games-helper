@@ -160,6 +160,17 @@ epicgames/
 └── README-zh-CN.md
 ```
 
+## 🙏 致谢与灵感来源
+
+本项目站在巨人的肩膀上，特别感谢：
+
+- **[claabs/epicgames-freegames-node](https://github.com/claabs/epicgames-freegames-node)** — 使用 Epic **Device Code OAuth 流程**代替账号密码登录的原始灵感。OAuth 的两步走流程（client_credentials → device_code）直接借鉴了他们的实现。
+- **[MixV2/EpicResearch](https://github.com/MixV2/EpicResearch)** — Epic 非公开 API 的详尽逆向工程文档。OAuth client 列表、grant type 规范、endpoint URL 都来源于这份研究。
+- **[xMistt/rebootpy](https://github.com/xMistt/rebootpy)** — Python Epic Games 库。提供了正确的 User-Agent header 和 account_service endpoint 格式参考。
+- **[FortniteEndpointsDocumentation](https://github.com/LeleDerGrasshalmi/FortniteEndpointsDocumentation)** — 社区维护的 endpoint 文档。
+
+如果你 fork 或基于本项目开发，请保留对原作者的致谢。
+
 ## ⚠️ 免责声明
 
 - 本项目仅供学习交流，请遵守 [Epic Games 服务条款](https://www.epicgames.com/site/en-US/terms-of-service)

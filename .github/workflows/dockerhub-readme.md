@@ -113,6 +113,12 @@ rm ./data/device_auth.enc
 
 ---
 
+## 🙏 Credits
+
+- [claabs/epicgames-freegames-node](https://github.com/claabs/epicgames-freegames-node) — Original inspiration for the **Device Code OAuth flow**
+- [MixV2/EpicResearch](https://github.com/MixV2/EpicResearch) — Comprehensive Epic API documentation
+- [xMistt/rebootpy](https://github.com/xMistt/rebootpy) — Python Epic library & auth headers
+
 ## 📜 License
 
 MIT

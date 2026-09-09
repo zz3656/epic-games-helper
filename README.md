@@ -155,6 +155,17 @@ epicgames/
 └── README.md
 ```
 
+## 🙏 Credits & Inspirations
+
+This project stands on the shoulders of giants. Special thanks to:
+
+- **[claabs/epicgames-freegames-node](https://github.com/claabs/epicgames-freegames-node)** — The original inspiration for using Epic's **Device Code OAuth flow** instead of password-based login. The two-step OAuth flow (client_credentials → device_code) is directly modeled after their implementation.
+- **[MixV2/EpicResearch](https://github.com/MixV2/EpicResearch)** — Comprehensive reverse-engineered documentation of Epic's non-public APIs. The OAuth client list, grant type specifications, and endpoint URLs are derived from this research.
+- **[xMistt/rebootpy](https://github.com/xMistt/rebootpy)** — Python Epic Games library. Demonstrated the correct User-Agent header and account_service endpoint format for device auth.
+- **[FortniteEndpointsDocumentation](https://github.com/LeleDerGrasshalmi/FortniteEndpointsDocumentation)** — Community-maintained endpoint documentation.
+
+If you fork or build upon this project, please credit these original works.
+
 ## ⚠️ Disclaimer
 
 - For educational purposes only. Please comply with [Epic Games Terms of Service](https://www.epicgames.com/site/en-US/terms-of-service).
