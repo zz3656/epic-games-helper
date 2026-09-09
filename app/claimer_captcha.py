@@ -18,41 +18,43 @@ logger = logging.getLogger(__name__)
 async def try_solve_hcaptcha(page: Page, target: Page) -> bool:
     """尝试自动点击 hCaptcha checkbox
 
-    hCaptcha 包含嵌套 iframe，需先切到 host frame 再切到 challenge frame。
-    简单 checkbox 点击可能触发图片挑战 — 那需要图像识别，无法自动完成。
+    hCaptcha 可能位于主页面或登录 iframe 中。
     返回 True 表示成功点击，False 表示失败。
     """
-    try:
-        iframe_selectors = [
-            'iframe[src*="hcaptcha.com"][src*="checkbox"]',
-            'iframe[src*="hcaptcha.com"]',
-        ]
-        for iframe_sel in iframe_selectors:
-            iframe_handle = await page.query_selector(iframe_sel)
-            if not iframe_handle:
-                continue
-            frame = await iframe_handle.content_frame()
-            if not frame:
-                continue
-            checkbox_selectors = [
-                '#checkbox',
-                '.checkmark',
-                '[id*="checkbox"]',
-                'div[role="checkbox"]',
+    # 尝试从主页和 target 两个 context 查找
+    for context_name, context in [("page", page), ("target", target)]:
+        try:
+            iframe_selectors = [
+                'iframe[src*="hcaptcha.com"][src*="checkbox"]',
+                'iframe[src*="hcaptcha.com"]',
+                'iframe[src*="hcaptcha"]',
             ]
-            for cb_sel in checkbox_selectors:
-                try:
-                    cb = await frame.query_selector(cb_sel)
-                    if cb:
-                        await cb.click()
-                        logger.info("hCaptcha checkbox 已点击: %s", cb_sel)
-                        return True
-                except Exception:
+            for iframe_sel in iframe_selectors:
+                iframe_handle = await context.query_selector(iframe_sel)
+                if not iframe_handle:
                     continue
-        return False
-    except Exception as e:
-        logger.warning("自动点击 hCaptcha 失败: %s", e)
-        return False
+                frame = await iframe_handle.content_frame()
+                if not frame:
+                    continue
+                # 点击 checkbox
+                checkbox_selectors = [
+                    '#checkbox',
+                    '.checkmark',
+                    '[id*="checkbox"]',
+                    'div[role="checkbox"]',
+                ]
+                for cb_sel in checkbox_selectors:
+                    try:
+                        cb = await frame.query_selector(cb_sel)
+                        if cb:
+                            await cb.click()
+                            logger.info("hCaptcha checkbox 已点击: %s (%s)", cb_sel, context_name)
+                            return True
+                    except Exception:
+                        continue
+        except Exception as e:
+            logger.warning("在 %s 中点击 hCaptcha 失败: %s", context_name, e)
+    return False
 
 
 async def wait_for_manual_captcha_solve(page: Page, timeout_seconds: int = 120) -> bool:

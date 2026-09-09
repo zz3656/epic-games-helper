@@ -356,21 +356,12 @@ class LoginHandler:
                         screenshot_tag="verification_required",
                     )
 
-            # 检查 hCaptcha 等图形验证码
-            has_captcha = await page.evaluate("""
-            () => {
-                return !!(
-                    document.querySelector('iframe[src*="hcaptcha"]') ||
-                    document.querySelector('iframe[src*="recaptcha"]') ||
-                    document.querySelector('[class*="captcha"]') ||
-                    document.querySelector('[id*="captcha"]') ||
-                    document.querySelector('.h-captcha') ||
-                    document.querySelector('#hcap-script') ||
-                    document.querySelector('[data-hcaptcha-widget-id]')
-                );
-            }
-            """)
-            if has_captcha:
+            # 检查 hCaptcha 等图形验证码（同时检查主页和 target iframe）
+            from app.claimer_login_post import has_hcaptcha_iframe, detect_hcaptcha_in_text
+            has_captcha = await has_hcaptcha_iframe(page, target)
+            has_captcha_text = detect_hcaptcha_in_text(combined_text)
+
+            if has_captcha or has_captcha_text:
                 logger.warning("检测到 hCaptcha，尝试自动点击验证 checkbox")
                 # 尝试自动点击 hCaptcha checkbox
                 captcha_clicked = await self._try_solve_hcaptcha(page, target)
@@ -436,11 +427,6 @@ class LoginHandler:
 
             await asyncio.sleep(2)
 
-        # 超时未检测到成功迹象
-        await self.parent._save_screenshot(page, "login_unknown")
-        preview = (immediate_text or "")[:200].replace("\n", " ")
-        return LoginResult(
-            status=LoginStatus.UNKNOWN,
-            reason=f"登录超时，Epic 未跳转。页面提示: {preview[:80] or '(空)'}",
-            screenshot_tag="login_unknown",
-        )
+        # 超时未检测到成功迹象 - 但可能页面中是 hCaptcha
+        from app.claimer_login_post import check_post_submit_state
+        return await check_post_submit_state(page, self.parent, immediate_text or "")
