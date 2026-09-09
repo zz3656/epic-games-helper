@@ -181,8 +181,18 @@ async function pollClaimProgress(claimId) {
                 let gamesHtml = "";
                 if (r.games && r.games.length > 0) {
                     gamesHtml = "<ul>" + r.games.map(g => {
-                        const icon = g.status === "claimed" ? "✅" : g.status === "already_claimed" ? "🔁" : "❌";
-                        return `<li>${icon} ${escapeHtml(g.title)} — ${escapeHtml(g.message || g.status)}</li>`;
+                        let icon = "❌";
+                        if (g.status === "claimed") icon = "✅";
+                        else if (g.status === "already_claimed") icon = "🔁";
+                        else if (g.status === "needs_manual") icon = "👉";
+                        let msg = escapeHtml(g.message || g.status);
+                        // needs_manual 状态下，message 中包含 URL，解析出来
+                        if (g.status === "needs_manual" && g.message) {
+                            const urlMatch = g.message.match(/https?:\/\/[^\s>"']+/);
+                            const url = urlMatch ? urlMatch[0] : '';
+                            msg = `<a href="${escapeHtml(url)}" target="_blank" style="color:#0078f2">点击领取 ${escapeHtml(g.title)}</a>`;
+                        }
+                        return `<li>${icon} ${escapeHtml(g.title)} — ${msg}</li>`;
                     }).join("") + "</ul>";
                 }
                 const cls = r.success ? "success" : "failed";

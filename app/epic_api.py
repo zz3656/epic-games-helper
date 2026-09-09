@@ -404,120 +404,34 @@ class EpicAPIClient:
     # ============================================
 
     async def claim_game(self, credentials: DeviceAuthCredentials, game: FreeGame) -> Tuple[str, str]:
-        """用 API 直接领取免费游戏
+        """生成 Epic Games 领取链接（checkout URL）
+
+        注意：Epic Games 的购买/领取流程无法通过纯 API 完成。
+        购买接口需要浏览器 session cookie、XSRF-TOKEN、hCaptcha 等。
+        因此我们生成一个 checkout URL，引导用户去浏览器手动领取。
+
+        参考：claabs/epicgames-freegames-node 的 generateCheckoutUrl
 
         Returns:
-            (status, message)  status: claimed/already_claimed/failed
+            (status, message)  status: claimed/already_claimed/failed/needs_manual
         """
-        # 检查 token 是否过期
+        # 检查 token 是否过期（用于生成 redirect URL）
         if credentials.is_expired():
-            credentials = await self.refresh_access_token(credentials)
-
-        try:
-            # Epic 购买流程（两步）：
-            # 1. POST https://www.epicgames.com/store/purchase → 创建订单
-            # 2. POST https://payment-website-pci.ol.epicgames.com/purchase/confirm-order → 确认订单
-            #
-            # 需要 XSRF token：先 GET /store 获取 cookie 中的 XSRF-TOKEN
-            xsrf_token = await self._get_xsrf_token(credentials)
-
-            purchase_headers = {
-                "Authorization": f"Bearer {credentials.access_token}",
-                "Content-Type": "application/json",
-            }
-            if xsrf_token:
-                purchase_headers["X-XSRF-TOKEN"] = xsrf_token
-
-            # 第一步：创建订单
-            logger.info("🔥 请求 Epic 购买: offer_id=%s namespace=%s", game.offer_id, game.offer_id.split("/")[0] if "/" in game.offer_id else "")
-            purchase_resp = await self.client.post(
-                "https://www.epicgames.com/store/purchase",
-                headers=purchase_headers,
-                json={
-                    "offers": [
-                        {
-                            "offerId": game.offer_id,
-                            "quantity": 1,
-                        }
-                    ],
-                    "namespace": game.offer_id.split("/")[0] if "/" in game.offer_id else "",
-                },
-            )
-            purchase_status = purchase_resp.status_code
-            purchase_text = purchase_resp.text
-            logger.info("🔥 购买响应: status=%d text=%s", purchase_status, purchase_text[:500] if purchase_text else "(empty)")
-
-            if purchase_status == 409:
-                return ("already_claimed", "已拥有")
-
-            if purchase_status == 401:
-                credentials = await self.refresh_access_token(credentials)
-                return await self.claim_game(credentials, game)
-
-            # 读取响应内容（记录日志用）
-            purchase_data = None
             try:
-                purchase_data = purchase_resp.json()
+                credentials = await self.refresh_access_token(credentials)
             except Exception:
                 pass
 
-            # 尝试从不同字段获取 order_id
-            order_id = ""
-            if purchase_data and isinstance(purchase_data, dict):
-                order_id = (
-                    purchase_data.get("orderId")
-                    or purchase_data.get("id")
-                    or purchase_data.get("order_id")
-                    or ""
-                )
+        # 生成 checkout URL（参考 claabs/epicgames-freegames-node）
+        namespace = game.offer_id.split("/")[0] if "/" in game.offer_id else ""
+        offers_param = f"&offers=1-{namespace}-{game.offer_id}"
+        checkout_url = f"https://www.epicgames.com/store/purchase?highlightColor=0078f2{offers_param}&orderId&purchaseToken&showNavigation=true"
+        login_redirect_url = (
+            f"https://www.epicgames.com/id/login?"
+            f"noHostRedirect=true&redirectUrl={checkout_url}&client_id=875a3b57d3a640a6b7f9b4e883463ab4"
+        )
 
-            if not order_id:
-                logger.warning("购买响应未返回 order_id: status=%d body=%s", purchase_status, purchase_text[:300] if purchase_text else "(empty)")
-
-            # 第二步：确认订单（使用 payment-website-pci 端点）
-            if order_id:
-                confirm_headers = {
-                    "Authorization": f"Bearer {credentials.access_token}",
-                    "Content-Type": "application/json",
-                }
-                if xsrf_token:
-                    confirm_headers["X-XSRF-TOKEN"] = xsrf_token
-
-                confirm_resp = await self.client.post(
-                    "https://payment-website-pci.ol.epicgames.com/purchase/confirm-order",
-                    headers=confirm_headers,
-                    json={
-                        "order_id": order_id,
-                    },
-                )
-
-                confirm_status = confirm_resp.status_code
-
-                if confirm_status in (200, 201):
-                    logger.info("游戏领取成功: %s (order_id=%s)", game.title, order_id)
-                    return ("claimed", "已成功领取")
-                else:
-                    logger.warning("订单确认失败 %s: status=%d body=%s",
-                                   game.title, confirm_status,
-                                   confirm_resp.text[:300] if confirm_resp.text else "(empty)")
-                    return ("failed", f"订单确认失败: HTTP {confirm_status}")
-
-            # 如果没有 order_id 但有 200 状态码（Epic 可能直接成功）
-            if purchase_status in (200, 201):
-                logger.info("游戏领取响应 200: %s", game.title)
-                return ("claimed", "已成功领取")
-
-            # 其他情况：返回完整错误信息
-            logger.warning("领取失败 %s: HTTP %s %s",
-                           game.title, purchase_status, purchase_text[:500] if purchase_text else "(empty)")
-            # 尝试解析错误信息
-            error_msg = f"HTTP {purchase_status}"
-            if purchase_data and isinstance(purchase_data, dict):
-                error_detail = purchase_data.get("message") or purchase_data.get("error") or purchase_data.get("errorCode") or ""
-                if error_detail:
-                    error_msg = f"HTTP {purchase_status}: {error_detail}"
-                    logger.info("Epic 错误详情: %s", error_detail)
-            return ("failed", error_msg)
-        except Exception as e:
-            logger.exception("领取异常: %s", game.title)
-            return ("failed", f"领取异常: {e}")
+        return (
+            "needs_manual",
+            f"请前往浏览器领取：<a href='{login_redirect_url}' target='_blank'>{game.title}</a>",
+        )

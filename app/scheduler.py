@@ -149,7 +149,7 @@ class ClaimScheduler:
                             fg.message = message
                             break
 
-                    status_icon = "✅" if status in ("claimed", "already_claimed") else "❌"
+                    status_icon = "✅" if status in ("claimed", "already_claimed") else "👉" if status == "needs_manual" else "❌"
                     await self._on_progress_callback(
                         f"{status_icon} {game.title}: {message}", "done"
                     )
@@ -162,7 +162,7 @@ class ClaimScheduler:
                 ]
 
                 result.success = all(
-                    g.status in ("claimed", "already_claimed")
+                    g.status in ("claimed", "already_claimed", "needs_manual")
                     for g in result.games
                 )
 

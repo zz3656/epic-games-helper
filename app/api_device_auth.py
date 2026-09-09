@@ -214,7 +214,7 @@ async def claim_now_with_device_auth(req: DeviceAuthClaimRequest):
                         "message": message,
                     })
 
-                success = all(g["status"] in ("claimed", "already_claimed") for g in results)
+                success = all(g["status"] in ("claimed", "already_claimed", "needs_manual") for g in results)
                 _claim_results[claim_id] = {
                     "success": success,
                     "username": f"DeviceAuth:{credentials.account_id[:6]}***",
