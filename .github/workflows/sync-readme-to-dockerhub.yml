@@ -22,7 +22,7 @@ jobs:
         env:
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_SHORT_DESC: Epic Games 周免自动领取 · 设备码授权零验证码 · Docker + Playwright · 输入一次每周自动跑。
+          DOCKERHUB_SHORT_DESC: Epic Games 周免自动领取 · 设备码授权 · 零浏览器零验证码 · 镜像 ~150MB。
         run: |
           python3 << 'PYEOF'
           import json, os, urllib.request, urllib.error

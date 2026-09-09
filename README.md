@@ -122,7 +122,7 @@ rm ./data/device_auth.enc
 ┌──────────────────────────────────────────────────┐
 │  FastAPI Backend (port 8000)                     │
 │  • /api/device-auth/*   Auth endpoints           │
-│  • /api/claim-now        Manual claim            │
+│  • /api/device-auth/claim-now  Manual claim      │
 │  • /api/auto-claim/toggle Scheduler toggle       │
 └──────────────────────────────────────────────────┘
                        ↓

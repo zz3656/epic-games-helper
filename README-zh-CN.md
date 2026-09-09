@@ -127,7 +127,7 @@ rm ./data/device_auth.enc
 ┌──────────────────────────────────────────────────┐
 │  FastAPI 后端（端口 8000）                        │
 │  • /api/device-auth/*    设备码授权              │
-│  • /api/claim-now         立即领取               │
+│  • /api/device-auth/claim-now  立即领取         │
 │  • /api/auto-claim/toggle 开关                   │
 └──────────────────────────────────────────────────┘
                        ↓
