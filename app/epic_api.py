@@ -290,10 +290,14 @@ class EpicAPIClient:
     # ============================================
 
     async def refresh_access_token(self, credentials: DeviceAuthCredentials) -> DeviceAuthCredentials:
-        """刷新 access_token（用 refresh_token 刷新，不需要重新授权）"""
+        """刷新 access_token（用 refresh_token 刷新，不需要重新授权）
+
+        快失败机制：
+        - 如果遇到 invalid_refresh_token 等不可重试错误，立即终止
+        - 避免多 client 尝试导致请求耗时过长
+        """
         import base64
 
-        # 尝试多个 client
         for client_id, client_secret, client_name in EPIC_CLIENTS:
             try:
                 auth_header = base64.b64encode(
@@ -320,6 +324,17 @@ class EpicAPIClient:
                 else:
                     logger.warning("Token 刷新 client=%s 失败: %s - %s",
                                    client_name, resp.status_code, resp.text[:200])
+                    # 如果是 refresh_token 本身无效，立即终止（其他 client 也会同样失败）
+                    if resp.status_code in (400, 401):
+                        try:
+                            err_data = resp.json()
+                            err_code = err_data.get("errorCode", "")
+                            # 这些错误表示 token 无效，不需重试
+                            if "invalid_refresh_token" in err_code or "invalid_grant" in err_code:
+                                logger.warning("refresh_token 无效，不再重试其他 client")
+                                break
+                        except Exception:
+                            pass
             except Exception as e:
                 logger.warning("Token 刷新 client=%s 异常: %s", client_name, e)
 
@@ -476,8 +491,9 @@ class EpicAPIClient:
         if credentials.is_expired():
             try:
                 credentials = await self.refresh_access_token(credentials)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("refresh token 失败，无法查询 library: %s", e)
+                return set()  # 快失败，避免反复重试
 
         owned_offer_ids = set()
         cursor = None

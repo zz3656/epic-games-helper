@@ -369,12 +369,29 @@ async function loadAccountGames() {
     if (!accountGamesGrid) return;
     accountGamesHint.textContent = "加载中…";
     try {
+        // 第一步：检查账号可用性
+        const accountResp = await fetch("/api/device-auth/account-info");
+        const accountInfo = await accountResp.json();
+
+        if (!accountInfo.configured) {
+            accountGamesGrid.innerHTML = `<div class="empty-state">❌ 未配置设备码授权</div>`;
+            accountGamesHint.textContent = "未授权";
+            return;
+        }
+
+        // 第二步：拉取免费游戏
         const resp = await fetch("/api/free-games");
         const data = await resp.json();
+
         if (!data.success) {
-            accountGamesGrid.innerHTML = `<div class="empty-state">加载失败：${escapeHtml(data.error || "")}</div>`;
+            const errMsg = data.error || "未知错误";
+            accountGamesGrid.innerHTML = `<div class="empty-state">
+                ❌ 加载失败<br>
+                <span style="font-size:12px; color:#fbbf24;">${escapeHtml(errMsg)}</span><br>
+                <span style="font-size:11px; color:#94a3b8;">账号: ${escapeHtml(accountInfo.account_id)} · ${accountInfo.library_api_accessible ? "账号可用" : "⚠️ 账号不可用"}</span>
+            </div>`;
             accountGamesHint.textContent = "加载失败";
-            console.error("free-games API 返回失败:", data);
+            console.error("free-games API 返回失败:", data, "账号状态:", accountInfo);
             return;
         }
 
@@ -388,7 +405,11 @@ async function loadAccountGames() {
             return;
         }
 
-        accountGamesHint.textContent = `本周 ${claimableGames.length} 款可领取 · ${ownedGames.length} 款已拥有`;
+        // 账号可用性提示
+        const accountHint = accountInfo.library_api_accessible
+            ? `账号 ${escapeHtml(accountInfo.account_id)} 已验证可用 · `
+            : `⚠️ 账号 ${escapeHtml(accountInfo.account_id)} token 可能已失效（已拥有状态可能不准） · `;
+        accountGamesHint.textContent = accountHint + `本周 ${claimableGames.length} 款可领取 · ${ownedGames.length} 款已拥有`;
 
         accountGamesGrid.innerHTML = games.map(g => {
             const owned = g.already_owned;

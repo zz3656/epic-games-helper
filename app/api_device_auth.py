@@ -417,6 +417,82 @@ async def test_claim_with_device_auth():
         }, status_code=500)
 
 
+@router.get("/api/device-auth/account-info")
+async def device_auth_account_info():
+    """查询当前已登录设备码账号的可用性
+
+    返回：
+    - configured: 是否已保存 device auth
+    - account_id: 账号 ID（脱敏）
+    - access_token_valid: access_token 是否有效
+    - library_api_accessible: library API 是否能访问（账户可用）
+    - error: 错误信息（如有）
+    """
+    if not _credential_store or not _credential_store.has_device_auth():
+        return JSONResponse(content={
+            "configured": False,
+            "account_id": "",
+            "access_token_valid": False,
+            "library_api_accessible": False,
+            "error": "未配置 device auth，请先完成设备码授权",
+        })
+
+    credentials = _credential_store.load_device_auth()
+    if not credentials:
+        return JSONResponse(content={
+            "configured": False,
+            "account_id": "",
+            "access_token_valid": False,
+            "library_api_accessible": False,
+            "error": "读取 device auth 失败（可能是 master key 不匹配）",
+        }, status_code=500)
+
+    account_id = credentials.account_id
+    masked_id = (account_id[:6] + "***") if account_id else ""
+
+    result = {
+        "configured": True,
+        "account_id": masked_id,
+        "access_token_valid": not credentials.is_expired(),
+        "library_api_accessible": False,
+        "error": "",
+    }
+
+    # 尝试使用 credentials 访问 library API 检查是否可用
+    from app.epic_api import EpicAPIClient
+    try:
+        async with EpicAPIClient() as client:
+            # 先尝试用现有 token
+            check_creds = credentials
+            if check_creds.is_expired():
+                try:
+                    check_creds = await client.refresh_access_token(check_creds)
+                    result["access_token_valid"] = True
+                except Exception as e:
+                    result["error"] = f"token 刷新失败：{e}"
+                    return JSONResponse(content=result)
+
+            # 尝试调 library API（只取 1 条验证可访问）
+            resp = await client.client.get(
+                "https://library-service.live.use1a.on.epicgames.com/library/api/public/items",
+                params={"includeMetadata": "true", "count": 1},
+                headers={"Authorization": f"Bearer {check_creds.access_token}"},
+            )
+            if resp.status_code == 200:
+                result["library_api_accessible"] = True
+            elif resp.status_code == 401:
+                result["error"] = "Token 无效，需重新授权"
+            elif resp.status_code == 403:
+                result["error"] = "Token 无权访问 library API，需重新授权"
+            else:
+                result["error"] = f"library API 返回 HTTP {resp.status_code}"
+    except Exception as e:
+        logger.exception("检查账号可用性异常")
+        result["error"] = f"检查异常：{type(e).__name__}: {e}"
+
+    return JSONResponse(content=result)
+
+
 @router.get("/api/free-games")
 async def get_free_games():
     """获取本周免费游戏列表，包含封面图、描述、是否已拥有、领取链接等信息
@@ -429,8 +505,13 @@ async def get_free_games():
     if _credential_store and _credential_store.has_device_auth():
         try:
             credentials = _credential_store.load_device_auth()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("读取 device auth 失败：%s", e)
+            return JSONResponse(content={
+                "success": False,
+                "error": f"读取 device auth 失败：{e}",
+                "credential_unavailable": True,
+            }, status_code=500)
 
     try:
         async with EpicAPIClient() as client:
