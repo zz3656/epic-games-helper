@@ -131,33 +131,28 @@ deleteDeviceAuthBtn.addEventListener("click", async () => {
 });
 
 // ============ 立即领取（设备码已授权时） ============
+// 现在改为：拉取本周免费游戏列表 + 复用 loadAccountGames
+// 点击后直接滚动到游戏库区域，因为领取链接已在那里生成
 claimNowBtn.addEventListener("click", async () => {
-    const claimId = "manual-" + Date.now();
+    const btnText = claimNowBtn.querySelector(".btn-text");
+    const btnSpinner = claimNowBtn.querySelector(".btn-spinner");
     claimNowBtn.disabled = true;
-    claimNowBtn.querySelector(".btn-text").hidden = true;
-    claimNowBtn.querySelector(".btn-spinner").hidden = false;
-    manualClaimResult.hidden = true;
+    btnText.hidden = true;
+    btnSpinner.hidden = false;
 
-    try {
-        const resp = await fetch("/api/device-auth/claim-now", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ claim_id: claimId }),
-        });
-        const data = await resp.json();
-        if (!resp.ok) {
-            showManualClaimResult({ error: data.detail || "领取失败" });
-            return;
-        }
+    // 重新加载游戏库（包含账号状态 + 领取链接）
+    await loadAccountGames();
 
-        // 开始轮询进度
-        if (claimProgressTimer) clearInterval(claimProgressTimer);
-        claimProgressTimer = setInterval(() => pollClaimProgress(claimId), 2000);
-        // 立即查一次
-        pollClaimProgress(claimId);
-    } catch (err) {
-        showManualClaimResult({ error: `网络错误: ${err.message}` });
+    // 滚动到游戏库区域
+    if (accountGamesSection) {
+        accountGamesSection.scrollIntoView({ behavior: "smooth", block: "start" });
     }
+
+    setTimeout(() => {
+        claimNowBtn.disabled = false;
+        btnText.hidden = false;
+        btnSpinner.hidden = true;
+    }, 1000);
 });
 
 async function pollClaimProgress(claimId) {
@@ -365,24 +360,44 @@ function daysUntilEnd(endIso) {
     } catch { return null; }
 }
 
+// 带超时的 fetch helper
+async function fetchWithTimeout(url, timeoutMs = 15000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const resp = await fetch(url, { signal: controller.signal });
+        return resp;
+    } catch (err) {
+        if (err.name === 'AbortError') {
+            throw new Error(`请求超时（${timeoutMs / 1000}秒）`);
+        }
+        throw err;
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
 async function loadAccountGames() {
     if (!accountGamesGrid) return;
     accountGamesHint.textContent = "加载中…";
 
-    // 第一步：检查账号可用性
+    // 第一步：检查账号可用性（10秒超时）
     let accountInfo;
     try {
-        const accountResp = await fetch("/api/device-auth/account-info");
+        const accountResp = await fetchWithTimeout("/api/device-auth/account-info", 10000);
+        if (!accountResp.ok) {
+            throw new Error(`HTTP ${accountResp.status}`);
+        }
         accountInfo = await accountResp.json();
         console.log("账号状态:", accountInfo);
     } catch (err) {
         console.error("account-info API 异常:", err);
+        accountGamesHint.textContent = "❌ 账号查询失败";
         accountGamesGrid.innerHTML = `<div class="empty-state">
             ❌ 账号状态查询失败<br>
             <span style="font-size:12px; color:#fbbf24;">${escapeHtml(String(err.message || err))}</span><br>
-            <span style="font-size:11px; color:#94a3b8;">请检查后端服务是否运行</span>
+            <span style="font-size:11px; color:#94a3b8;">请检查后端服务是否运行（端口 8000）</span>
         </div>`;
-        accountGamesHint.textContent = "账号查询失败";
         return;
     }
 
@@ -395,17 +410,19 @@ async function loadAccountGames() {
         return;
     }
 
-    // 第二步：拉取免费游戏
+    // 第二步：拉取免费游戏（20秒超时）
     let data;
     try {
-        const resp = await fetch("/api/free-games");
+        const resp = await fetchWithTimeout("/api/free-games", 20000);
+        if (!resp.ok) {
+            throw new Error(`HTTP ${resp.status}`);
+        }
         data = await resp.json();
         console.log("free-games API 返回:", data);
     } catch (err) {
         console.error("free-games API 异常:", err);
-        accountGamesHint.textContent = "游戏列表请求失败";
+        accountGamesHint.textContent = "❌ 游戏列表请求失败";
         const errMsg = String(err.message || err);
-        // 在现有卡片下方追加错误信息
         accountGamesGrid.innerHTML += `<div class="empty-state" style="margin-top:12px;">
             ❌ 游戏列表请求失败<br>
             <span style="font-size:12px; color:#fbbf24;">${escapeHtml(errMsg)}</span>
@@ -414,12 +431,11 @@ async function loadAccountGames() {
     }
 
     if (!data.success) {
-        accountGamesHint.textContent = "加载失败";
+        accountGamesHint.textContent = "❌ 加载失败";
         const errMsg = data.error || "未知错误";
         accountGamesGrid.innerHTML += `<div class="empty-state" style="margin-top:12px;">
             ❌ free-games API 返回失败<br>
-            <span style="font-size:12px; color:#fbbf24;">${escapeHtml(errMsg)}</span><br>
-            <span style="font-size:11px; color:#94a3b8;">账号: ${escapeHtml(accountInfo.account_id)} · ${accountInfo.library_api_accessible ? "账号可用" : "⚠️ 账号不可用"}</span>
+            <span style="font-size:12px; color:#fbbf24;">${escapeHtml(errMsg)}</span>
         </div>`;
         return;
     }
@@ -434,7 +450,7 @@ async function loadAccountGames() {
         if (diag.library_fetch_ok === false) {
             diagParts.push(`⚠️ 库查询失败：${escapeHtml(diag.library_fetch_error || "未知错误")}`);
         } else if (diag.library_fetch_ok === true) {
-            diagParts.push("库查询成功");
+            diagParts.push("✓ 库查询成功");
         }
         if (diagParts.length > 0) {
             console.log("free-games diagnostics:", diag);
@@ -515,22 +531,24 @@ function renderAccountStatusCard(info) {
     }
 
     const tokenOk = info.access_token_valid;
-    const libOk = info.library_api_accessible;
-    const errorMsg = info.error || "";
+    const expiresIn = info.access_token_expires_in || 0;
+    const errorMsg = info.note || "";
 
     // 总体状态
     let statusIcon = "✅";
-    let statusText = "账号完全可用";
-    let statusClass = "ok";
-    if (!libOk) {
-        statusIcon = "❌";
-        statusText = "账号不可用";
-        statusClass = "bad";
-    } else if (!tokenOk) {
+    let statusText = "账号已授权";
+    if (!tokenOk) {
         statusIcon = "⚠️";
-        statusText = "账号部分可用（token 过期但 refresh 后恢复了）";
-        statusClass = "warn";
+        statusText = "token 过期（下次使用时会自动刷新）";
     }
+
+    const expiresText = expiresIn > 3600
+        ? `约 ${Math.round(expiresIn / 3600)} 小时后过期`
+        : expiresIn > 60
+        ? `约 ${Math.round(expiresIn / 60)} 分钟后过期`
+        : expiresIn > 0
+        ? `仅剩 ${expiresIn} 秒`
+        : "已过期";
 
     const checks = [
         {
@@ -541,12 +559,12 @@ function renderAccountStatusCard(info) {
         {
             name: "access_token 有效",
             pass: tokenOk,
-            detail: tokenOk ? "未过期或已成功刷新" : "access_token 已过期"
+            detail: tokenOk ? expiresText : "已过期（下次调用 API 时会自动 refresh）"
         },
         {
-            name: "library API 可访问",
-            pass: libOk,
-            detail: libOk ? "能查询已拥有游戏" : "无法查询账户库（token 可能无效）"
+            name: "凭证存储正常",
+            pass: !!info.device_id_prefix,
+            detail: `Device: ${escapeHtml(info.device_id_prefix || "未知")}`
         },
     ];
 

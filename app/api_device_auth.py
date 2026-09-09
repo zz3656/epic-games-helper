@@ -419,22 +419,25 @@ async def test_claim_with_device_auth():
 
 @router.get("/api/device-auth/account-info")
 async def device_auth_account_info():
-    """查询当前已登录设备码账号的可用性
+    """查询当前已登录设备码账号的基本信息
 
     返回：
     - configured: 是否已保存 device auth
     - account_id: 账号 ID（脱敏）
-    - access_token_valid: access_token 是否有效
-    - library_api_accessible: library API 是否能访问（账户可用）
-    - error: 错误信息（如有）
+    - access_token_valid: access_token 是否有效（本地判断）
+    - access_token_expires_in: 过期时间（秒）
+    - note: 说明文字
+
+    注意：此接口不调任何 Epic API，避免超时。只检查本地凭证状态。
+    library API 的检查请使用 /api/free-games 返回的 diagnostics。
     """
     if not _credential_store or not _credential_store.has_device_auth():
         return JSONResponse(content={
             "configured": False,
             "account_id": "",
             "access_token_valid": False,
-            "library_api_accessible": False,
-            "error": "未配置 device auth，请先完成设备码授权",
+            "access_token_expires_in": 0,
+            "note": "未配置 device auth，请先完成设备码授权",
         })
 
     credentials = _credential_store.load_device_auth()
@@ -443,63 +446,23 @@ async def device_auth_account_info():
             "configured": False,
             "account_id": "",
             "access_token_valid": False,
-            "library_api_accessible": False,
-            "error": "读取 device auth 失败（可能是 master key 不匹配）",
+            "access_token_expires_in": 0,
+            "note": "读取 device auth 失败（可能是 master key 不匹配）",
         }, status_code=500)
 
     account_id = credentials.account_id
     masked_id = (account_id[:6] + "***") if account_id else ""
 
-    result = {
+    expires_in = max(0, int(credentials.expires_at - time.time())) if credentials.expires_at else 0
+
+    return JSONResponse(content={
         "configured": True,
         "account_id": masked_id,
+        "device_id_prefix": (credentials.device_id[:6] + "***") if credentials.device_id else "",
         "access_token_valid": not credentials.is_expired(),
-        "access_token_expires_in": max(0, int(credentials.expires_at - time.time())) if credentials.expires_at else 0,
-        "library_api_accessible": False,
-        "error": "",
-    }
-
-    # 尝试使用 credentials 访问 library API 检查是否可用
-    from app.epic_api import EpicAPIClient
-    import asyncio
-
-    try:
-        # 给整个检查流程加上 5 秒超时，避免卡死前端请求
-        async def _check_library():
-            async with EpicAPIClient() as client:
-                check_creds = credentials
-                if check_creds.is_expired():
-                    try:
-                        check_creds = await client.refresh_access_token(check_creds)
-                        result["access_token_valid"] = True
-                    except Exception as e:
-                        result["error"] = f"token 刷新失败：{e}"
-                        return
-
-                resp = await client.client.get(
-                    "https://library-service.live.use1a.on.epicgames.com/library/api/public/items",
-                    params={"includeMetadata": "true", "count": 1},
-                    headers={"Authorization": f"Bearer {check_creds.access_token}"},
-                    timeout=5.0,
-                )
-                if resp.status_code == 200:
-                    result["library_api_accessible"] = True
-                elif resp.status_code == 401:
-                    result["error"] = "Token 无效，需重新授权"
-                elif resp.status_code == 403:
-                    result["error"] = "Token 无权访问 library API，需重新授权"
-                else:
-                    result["error"] = f"library API 返回 HTTP {resp.status_code}"
-
-        try:
-            await asyncio.wait_for(_check_library(), timeout=8.0)
-        except asyncio.TimeoutError:
-            result["error"] = "library API 超时（网络问题或 token 过期）"
-    except Exception as e:
-        logger.exception("检查账号可用性异常")
-        result["error"] = f"检查异常：{type(e).__name__}: {e}"
-
-    return JSONResponse(content=result)
+        "access_token_expires_in": expires_in,
+        "note": "本地凭证检查。如需验证账号可用性，请调用 /api/free-games",
+    })
 
 
 @router.get("/api/free-games")
