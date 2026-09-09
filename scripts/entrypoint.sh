@@ -95,8 +95,13 @@ if [ "${ENABLE_VNC:-false}" = "true" ]; then
     fi
     sleep 1
     # 启动占位窗口（让用户连接 VNC 后看到内容，验证 VNC 正常）
-    # 优先使用轻量的 xeyes（只要 1MB 左右）
-    if command -v xeyes >/dev/null 2>&1; then
+    # 优先使用 xterm，可以显示说明文字
+    if command -v xterm >/dev/null 2>&1; then
+        xterm -fa "DejaVu Sans Mono" -fs 11 -bg black -fg white \
+              -title "Epic Games Claimer - VNC" \
+              -geometry 80x24+50+50 \
+              -e "echo '🎮 VNC 就绪！'; echo ''; echo '请到 Web 界面点击「开始领取」'; echo '领取任务运行时 Chrome 会出现在这里'; echo ''; echo '遇到 hCaptcha 时手动验证'; echo ''; read -p '不要关闭此窗口'; exec bash" &
+    elif command -v xeyes >/dev/null 2>&1; then
         xeyes -display :99 &
     elif command -v xclock >/dev/null 2>&1; then
         xclock -display :99 -update 1 &

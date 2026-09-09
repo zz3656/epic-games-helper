@@ -51,6 +51,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     novnc \
     websockify \
     x11-utils \
+    xterm \
     \
     && rm -rf /var/lib/apt/lists/*
 

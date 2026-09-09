@@ -66,6 +66,10 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
+# 注册拆分的路由
+from app.api_vnc import router as vnc_router
+app.include_router(vnc_router)
+
 
 # ============== 进度追踪 ==============
 claim_progress: Dict[str, Dict[str, Any]] = {}
@@ -152,28 +156,7 @@ async def health():
     }
 
 
-@app.get("/api/vnc/status")
-async def vnc_status():
-    """查询 VNC 服务状态（供前端检测是否启用了 VNC）"""
-    import os
-    import subprocess
-    enabled = os.getenv("ENABLE_VNC", "false").lower() == "true"
-    # 检查进程是否存在
-    vnc_running = False
-    novnc_running = False
-    try:
-        ps = subprocess.run(["ps", "-ef"], capture_output=True, text=True, timeout=5)
-        vnc_running = "x11vnc" in ps.stdout
-        novnc_running = "websockify" in ps.stdout or "novnc" in ps.stdout
-    except Exception:
-        pass
-    return {
-        "enabled": enabled,
-        "vnc_running": vnc_running,
-        "novnc_running": novnc_running,
-        "novnc_url": "/vnc.html" if novnc_running else None,
-        "vnc_password_set": bool(os.getenv("VNC_PASSWORD")),
-    }
+# /api/vnc/status 等 VNC/截图接口已拆出到 app.api_vnc
 
 
 async def _progress_callback(claim_id: str, step: str, status: str):
@@ -347,36 +330,7 @@ async def credentials_status():
     }
 
 
-@app.get("/api/screenshots")
-async def list_screenshots():
-    """列出可用截图（调试用）"""
-    screenshot_dir = "/app/screenshots"
-    try:
-        if not os.path.exists(screenshot_dir):
-            return {"files": []}
-        files = sorted(
-            [f for f in os.listdir(screenshot_dir) if f.endswith(".png")],
-            key=lambda x: os.path.getmtime(os.path.join(screenshot_dir, x)),
-            reverse=True,
-        )
-        return {"files": files[:20]}
-    except Exception as e:
-        return {"files": [], "error": str(e)}
-
-
-@app.get("/api/screenshots/{filename}")
-async def get_screenshot(filename: str):
-    """获取截图（调试用）"""
-    screenshot_dir = "/app/screenshots"
-    path = os.path.join(screenshot_dir, filename)
-    # 安全检查：防止路径穿越
-    if not os.path.exists(path) or ".." in filename or "/" in filename:
-        raise HTTPException(status_code=404, detail="截图不存在")
-    # 明确设置 media_type 以便浏览器正确渲染
-    return FileResponse(path, media_type="image/png", headers={
-        "Cache-Control": "no-cache",
-        "Content-Disposition": f'inline; filename="{filename}"',
-    })
+# /api/screenshots 接口已拆出到 app.api_vnc
 
 
 @app.post("/api/auto-claim/toggle")
