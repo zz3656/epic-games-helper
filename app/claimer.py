@@ -141,27 +141,9 @@ class EpicClaimer:
         await self.close()
 
     async def start(self):
+        from app.claimer_browser import build_launch_kwargs
         self._playwright = await async_playwright().start()
-        # 使用 new headless 模式（更接近真实浏览器，不会设置 webdriver=true）
-        launch_kwargs = {
-            "headless": self.headless,
-            "args": [
-                # 隐藏 navigator.webdriver 标志
-                "--disable-blink-features=AutomationControlled",
-                "--no-sandbox",
-                "--disable-dev-shm-usage",
-                # 隐藏自动化特征
-                "--disable-features=IsolateOrigins,site-per-process",
-                # 使浏览器看起来更像正常用户
-                "--disable-infobars",
-                "--window-size=1440,900",
-                "--start-maximized",
-            ],
-        }
-        if self.headless:
-            # 使用 Chrome 的 new headless 模式
-            launch_kwargs["args"].append("--headless=new")
-            launch_kwargs["args"].append("--disable-gpu")
+        launch_kwargs = build_launch_kwargs(self.headless)
         self._browser = await self._playwright.chromium.launch(**launch_kwargs)
         logger.info("Browser launched (headless=%s, mode=%s)", self.headless, "new" if self.headless else "visible")
 

@@ -212,9 +212,9 @@ function showClaimResult(box, data) {
                 tips: [
                     "Epic 检测到异常环境，弹出 hCaptcha 验证",
                     "点击下方的截图链接查看验证页面",
-                    data.vnc_enabled ? "✓ VNC 已启用：新窗口打开 http://服务器IP:6080/vnc.html 手动完成验证" : "⚠ 未启用 VNC：需修改 docker-compose.yml 添加 ENABLE_VNC=true 重启",
+                    data.vnc_enabled ? "✓ VNC 已启用：新窗口打开 noVNC，手动完成验证" : "⚠ 未启用 VNC：需修改 docker-compose.yml 添加 ENABLE_VNC=true 重启",
+                    "⚠ noVNC 黑屏是正常的：只有当领取任务运行时会看到 Chrome，请先点击「开始领取」",
                     "完成后领取任务会自动继续（等待最多 120 秒）",
-                    "或等待 5-10 分钟后重试（hCaptcha 冷却）",
                 ],
                 vncLink: data.vnc_enabled ? (window.location.protocol + "//" + window.location.hostname + ":6080/vnc.html") : null,
             },

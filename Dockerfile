@@ -50,6 +50,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     x11vnc \
     novnc \
     websockify \
+    x11-utils \
+    \
     && rm -rf /var/lib/apt/lists/*
 
 # 创建工作目录

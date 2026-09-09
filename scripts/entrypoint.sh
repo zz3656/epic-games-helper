@@ -94,9 +94,18 @@ if [ "${ENABLE_VNC:-false}" = "true" ]; then
         websockify 6080 localhost:5900 &
     fi
     sleep 1
+    # 启动占位窗口（让用户连接 VNC 后看到内容，验证 VNC 正常）
+    # 优先使用轻量的 xeyes（只要 1MB 左右）
+    if command -v xeyes >/dev/null 2>&1; then
+        xeyes -display :99 &
+    elif command -v xclock >/dev/null 2>&1; then
+        xclock -display :99 -update 1 &
+    fi
+    sleep 1
     echo "[INFO] VNC server started:"
     echo "[INFO]   noVNC URL: http://localhost:6080/vnc.html"
     echo "[INFO]   VNC port: 5900"
+    echo "[INFO]   Xvfb display: :99 (1440x900x24)"
 fi
 
 # ============================================
