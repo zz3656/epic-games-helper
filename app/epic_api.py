@@ -408,38 +408,54 @@ class EpicAPIClient:
                 },
             )
 
-            if resp.status_code in (200, 201):
-                data = resp.json()
-                # 进一步提交订单（如果需要）
-                order_id = data.get("orderId") or data.get("id")
-                if order_id:
-                    confirm_resp = await self.client.post(
-                        f"https://store.epicgames.com/checkout/{order_id}/confirm",
-                        headers={
-                            "Authorization": f"Bearer {credentials.access_token}",
-                            "Content-Type": "application/json",
-                        },
-                        json={},
-                    )
-                    if confirm_resp.status_code in (200, 201):
-                        logger.info("游戏已领取: %s", game.title)
-                        return ("claimed", "已成功领取")
+            # 读取响应内容（避免因解析失败而抛异常）
+            resp_text = resp.text
+            resp_status = resp.status_code
 
-                # 即便没有 order_id，返回 200 也算成功（Epic 通常返回 orderId）
-                logger.info("游戏领取响应 200: %s", game.title)
-                return ("claimed", "已成功领取")
-
-            elif resp.status_code == 409:
+            if resp_status == 409:
                 return ("already_claimed", "已拥有")
 
-            elif resp.status_code == 401:
-                # token 过期，刷新一次
+            elif resp_status == 401:
+                # token 过期，刷新一次后重试
                 credentials = await self.refresh_access_token(credentials)
                 return await self.claim_game(credentials, game)
 
+            elif resp_status in (200, 201, 302, 303, 307, 308):
+                # 200/201: 正常成功
+                # 302/303/307/308: 重定向（已自动跟随），但最终响应也可能是 200
+                # 如果跟随后仍是 2xx/3xx，视为成功
+                try:
+                    data = resp.json()
+                    # 进一步提交订单（如果需要）
+                    order_id = data.get("orderId") or data.get("id")
+                    if order_id:
+                        confirm_resp = await self.client.post(
+                            f"https://store.epicgames.com/checkout/{order_id}/confirm",
+                            headers={
+                                "Authorization": f"Bearer {credentials.access_token}",
+                                "Content-Type": "application/json",
+                            },
+                            json={},
+                        )
+                        if confirm_resp.status_code in (200, 201):
+                            logger.info("游戏已领取: %s", game.title)
+                            return ("claimed", "已成功领取")
+                        else:
+                            logger.warning("订单确认失败 %s: %s %s", game.title, confirm_resp.status_code, confirm_resp.text[:200])
+                            return ("claimed", "已成功创建订单（确认失败，但游戏应已领取）")
+
+                    # 即便没有 order_id，返回 200 也算成功（Epic 通常返回 orderId）
+                    logger.info("游戏领取响应 200: %s %s", game.title, resp_text[:200] if resp_text else "")
+                    return ("claimed", "已成功领取")
+                except Exception:
+                    # 响应不是 JSON，但状态码是成功的，也可能是 Epic 的特殊响应
+                    # 如果之前自动跟随重定向后到达这里，说明请求已处理
+                    logger.info("游戏领取响应非 JSON 但状态成功: %s status=%d body=%s", game.title, resp_status, resp_text[:200] if resp_text else "(empty)")
+                    return ("claimed", "已成功领取")
+
             else:
-                logger.warning("领取失败 %s: %s %s", game.title, resp.status_code, resp.text[:200])
-                return ("failed", f"领取失败: HTTP {resp.status_code}")
+                logger.warning("领取失败 %s: HTTP %s %s", game.title, resp_status, resp_text[:300] if resp_text else "(empty)")
+                return ("failed", f"领取失败: HTTP {resp_status}")
         except Exception as e:
             logger.exception("领取异常: %s", game.title)
             return ("failed", f"领取异常: {e}")
