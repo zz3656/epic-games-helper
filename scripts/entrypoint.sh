@@ -94,13 +94,27 @@ if [ "${ENABLE_VNC:-false}" = "true" ]; then
         websockify 6080 localhost:5900 &
     fi
     sleep 1
+    # 启动轻量级窗口管理器（让 Chrome 窗口可以显示）
+    if command -v fluxbox >/dev/null 2>&1; then
+        fluxbox -display :99 &
+    fi
+    sleep 1
+
     # 启动占位窗口（让用户连接 VNC 后看到内容，验证 VNC 正常）
     # 优先使用 xterm，可以显示说明文字
     if command -v xterm >/dev/null 2>&1; then
-        xterm -fa "DejaVu Sans Mono" -fs 11 -bg black -fg white \
+        # 使用支持 CJK 的字体，避免中文显示为方块
+        FONT="DejaVu Sans Mono"
+        for f in "WenQuanYi Micro Hei" "WenQuanYi Zen Hei" "Noto Sans CJK SC" "Noto Sans Mono CJK SC"; do
+            if fc-list | grep -qi "$f"; then
+                FONT="$f"
+                break
+            fi
+        done
+        xterm -fa "$FONT" -fs 11 -bg black -fg white \
               -title "Epic Games Claimer - VNC" \
               -geometry 80x24+50+50 \
-              -e "echo '🎮 VNC 就绪！'; echo ''; echo '请到 Web 界面点击「开始领取」'; echo '领取任务运行时 Chrome 会出现在这里'; echo ''; echo '遇到 hCaptcha 时手动验证'; echo ''; read -p '不要关闭此窗口'; exec bash" &
+              -e "echo '🎮 VNC is ready!'; echo ''; echo 'Please click Start Claim in web UI'; echo 'Chrome will appear here during claim task'; echo ''; echo 'Solve hCaptcha manually if prompted'; echo ''; read -p 'Do NOT close this window'; exec bash" &
     elif command -v xeyes >/dev/null 2>&1; then
         xeyes -display :99 &
     elif command -v xclock >/dev/null 2>&1; then

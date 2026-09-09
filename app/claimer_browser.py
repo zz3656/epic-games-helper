@@ -56,6 +56,7 @@ def build_launch_kwargs(headless: bool) -> dict:
         launch_kwargs["args"].extend([
             "--disable-gpu-sandbox",
             "--disable-software-rasterizer",
+            "--window-position=200,200",  # 放在 xterm 旁边避免遮挡
         ])
         # 记录日志供调试
         logger.info("VNC 模式启动参数: DISPLAY=%s, headless=%s, args=%s",
