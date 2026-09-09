@@ -40,9 +40,15 @@ EPIC_PURCHASE_ORDER = "https://store.epicgames.com/purchase"
 EPIC_CHECKOUT_ORDER = "https://payment-website-pci.ol.epicgames.com/checkout/order"
 
 # OAuth client credentials
-# claabs/epicgames-freegames-node 验证可以工作的：
-EPIC_DEVICE_AUTH_CLIENT_ID = "98f7e42c2e3a4f86a74eb43fbb41ed39"
-EPIC_DEVICE_AUTH_CLIENT_SECRET = "0a2449a2-001a-451e-afec-3e812901c4d7"
+# 参考 MixV2/EpicResearch 官方文档推荐的 fortnitePCGameClient
+# 以及 claabs/epicgames-freegames-node 使用的 fortniteNewSwitchGameClient
+EPIC_CLIENTS = [
+    # (client_id, client_secret, name)
+    ("ec684b8c687f479fadea3cb2ad83f5c6", "e1f31c211f28413186262d37a13fc84d", "fortnitePCGameClient"),
+    ("98f7e42c2e3a4f86a74eb43fbb41ed39", "0a2449a2-001a-451e-afec-3e812901c4d7", "fortniteNewSwitchGameClient"),
+    ("34a02cf8f4414e29b15921876da36f9a", "daafbccc737745039dffe53d94fc76cf", "launcherAppClient2"),
+    ("875a3b57d3a640a6b7f9b4e883463ab4", "eJhY0mH4g8mVCQpRbnD6c5Tr4g9x1yHJ", "dieselWebsite"),
+]
 
 # Launch URL user uses in browser
 EPIC_LAUNCH_URL_BASE = "https://www.epicgames.com/id/login?redirectUrl="
@@ -120,36 +126,41 @@ class EpicAPIClient:
     # ============================================
     # Device Auth Flow（用户在自己浏览器完成）
     #
-    # 严格遵循 claabs/epicgames-freegames-node 的两步走流程：
+    # 严格遵循 MixV2/EpicResearch + claabs 的两步走流程：
     # 1. 用 client_credentials grant type 拿一个 access_token
     # 2. 用该 token 作为 Bearer 去申请 device_code
     # ============================================
 
-    async def _get_client_credentials_token(self) -> str:
+    async def _get_client_credentials_token(self, client_id: str, client_secret: str) -> str:
         """第一步：用 client_credentials 获取临时 access_token"""
         import base64
 
         auth_header = base64.b64encode(
-            f"{EPIC_DEVICE_AUTH_CLIENT_ID}:{EPIC_DEVICE_AUTH_CLIENT_SECRET}".encode()
+            f"{client_id}:{client_secret}".encode()
         ).decode()
 
-        resp = await self.client.post(
-            EPIC_TOKEN,
-            headers={
-                "Authorization": f"Basic {auth_header}",
-                "Content-Type": "application/x-www-form-urlencoded",
-            },
-            data={
-                "grant_type": "client_credentials",
-            },
-        )
-        if resp.status_code != 200:
-            raise Exception(
-                f"client_credentials 失败: {resp.status_code} - {resp.text[:300]}"
-            )
-        data = resp.json()
-        logger.info("client_credentials token 获取成功 (expires_in=%s)", data.get("expires_in"))
-        return data["access_token"]
+        for endpoint in [EPIC_TOKEN, "https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/token"]:
+            try:
+                resp = await self.client.post(
+                    endpoint,
+                    headers={
+                        "Authorization": f"Basic {auth_header}",
+                        "Content-Type": "application/x-www-form-urlencoded",
+                    },
+                    data={
+                        "grant_type": "client_credentials",
+                    },
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    logger.info("client_credentials token 获取成功 (expires_in=%s)", data.get("expires_in"))
+                    return data["access_token"]
+                else:
+                    logger.warning("client_credentials endpoint=%s 失败: %s - %s",
+                                   endpoint, resp.status_code, resp.text[:200])
+            except Exception as e:
+                logger.warning("client_credentials endpoint=%s 异常: %s", endpoint, e)
+        raise Exception("client_credentials 失败（所有 endpoint 都未成功）")
 
     async def request_device_code(self) -> Tuple[str, str, str, int, str]:
         """申请 device code
@@ -157,41 +168,52 @@ class EpicAPIClient:
         Returns:
             (device_code, user_code, verification_uri, expires_in, client_used)
         """
-        # 第一步：获取 client_credentials token
-        bearer_token = await self._get_client_credentials_token()
+        import base64
 
-        # 第二步：用 bearer token 申请 device_code
-        for endpoint in [EPIC_DEVICE_AUTH, EPIC_DEVICE_AUTH_ALT]:
+        # 尝试多个 client
+        last_error = None
+        for client_id, client_secret, client_name in EPIC_CLIENTS:
             try:
-                resp = await self.client.post(
-                    endpoint,
-                    params={"prompt": "login"},
-                    headers={
-                        "Authorization": f"Bearer {bearer_token}",
-                    },
-                )
-                if resp.status_code == 200:
-                    data = resp.json()
-                    logger.info("Device code 申请成功 (endpoint=%s)", endpoint)
-                    logger.debug("Response: %s", data)
-                    verification_uri = data.get(
-                        "verification_uri_complete",
-                        data.get("verification_uri", "")
-                    )
-                    return (
-                        data["device_code"],
-                        data["user_code"],
-                        verification_uri,
-                        data.get("expires_in", 600),
-                        "fortniteNewSwitchGameClient",
-                    )
-                else:
-                    logger.warning("Device code endpoint=%s 失败: %s - %s",
-                                   endpoint, resp.status_code, resp.text[:200])
-            except Exception as e:
-                logger.warning("Device code endpoint=%s 异常: %s", endpoint, e)
+                # 第一步：获取 client_credentials token
+                bearer_token = await self._get_client_credentials_token(client_id, client_secret)
 
-        raise Exception("申请 device code 失败（所有 endpoint 尝试均未成功）")
+                # 第二步：用 bearer token 申请 device_code
+                for endpoint in [EPIC_DEVICE_AUTH, EPIC_DEVICE_AUTH_ALT]:
+                    try:
+                        resp = await self.client.post(
+                            endpoint,
+                            params={"prompt": "login"},
+                            headers={
+                                "Authorization": f"Bearer {bearer_token}",
+                            },
+                        )
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            logger.info("Device code 申请成功 (client=%s, endpoint=%s)",
+                                        client_name, endpoint)
+                            verification_uri = data.get(
+                                "verification_uri_complete",
+                                data.get("verification_uri", "")
+                            )
+                            return (
+                                data["device_code"],
+                                data["user_code"],
+                                verification_uri,
+                                data.get("expires_in", 600),
+                                client_name,
+                            )
+                        else:
+                            logger.warning("Device code client=%s endpoint=%s 失败: %s - %s",
+                                           client_name, endpoint, resp.status_code, resp.text[:200])
+                            last_error = f"{resp.status_code} - {resp.text[:200]}"
+                    except Exception as e:
+                        logger.warning("Device code endpoint=%s 异常: %s", endpoint, e)
+                        last_error = str(e)
+            except Exception as e:
+                logger.warning("client=%s 全流程失败: %s", client_name, e)
+                last_error = str(e)
+
+        raise Exception(f"所有 client 都失败。最后错误: {last_error}")
 
     async def poll_device_code(self, device_code: str) -> Optional[DeviceAuthCredentials]:
         """轮询 device code 完成情况
@@ -200,43 +222,45 @@ class EpicAPIClient:
         """
         import base64
 
-        auth_header = base64.b64encode(
-            f"{EPIC_DEVICE_AUTH_CLIENT_ID}:{EPIC_DEVICE_AUTH_CLIENT_SECRET}".encode()
-        ).decode()
-
-        try:
-            resp = await self.client.post(
-                EPIC_TOKEN,
-                headers={
-                    "Authorization": f"Basic {auth_header}",
-                    "Content-Type": "application/x-www-form-urlencoded",
-                },
-                data={
-                    "grant_type": "device_code",
-                    "device_code": device_code,
-                },
-            )
-            if resp.status_code == 200:
-                data = resp.json()
-                logger.info("Device code 认证成功")
-                return DeviceAuthCredentials(
-                    account_id=data.get("account_id", ""),
-                    device_id=data.get("device_id", ""),
-                    secret=data.get("secret", ""),
-                    access_token=data.get("access_token", ""),
-                    refresh_token=data.get("refresh_token", ""),
-                    expires_at=time.time() + data.get("expires_in", 7200),
+        # 尝试多个 client
+        for client_id, client_secret, client_name in EPIC_CLIENTS:
+            try:
+                auth_header = base64.b64encode(
+                    f"{client_id}:{client_secret}".encode()
+                ).decode()
+                resp = await self.client.post(
+                    EPIC_TOKEN,
+                    headers={
+                        "Authorization": f"Basic {auth_header}",
+                        "Content-Type": "application/x-www-form-urlencoded",
+                    },
+                    data={
+                        "grant_type": "device_code",
+                        "device_code": device_code,
+                    },
                 )
-            elif resp.status_code in (400, 428):
-                # 用户还没完成认证（预期状态）
-                # Epic 返回的错误码: errors.com.epicgames.account.oauth.authorization_pending
-                return None
-            else:
-                logger.warning("轮询失败: %s - %s", resp.status_code, resp.text[:200])
-                return None
-        except Exception as e:
-            logger.warning("轮询异常: %s", e)
-            return None
+                if resp.status_code == 200:
+                    data = resp.json()
+                    logger.info("Device code 认证成功 (client=%s)", client_name)
+                    return DeviceAuthCredentials(
+                        account_id=data.get("account_id", ""),
+                        device_id=data.get("device_id", ""),
+                        secret=data.get("secret", ""),
+                        access_token=data.get("access_token", ""),
+                        refresh_token=data.get("refresh_token", ""),
+                        expires_at=time.time() + data.get("expires_in", 7200),
+                    )
+                elif resp.status_code in (400, 428):
+                    # 用户还没完成认证（预期状态）
+                    continue
+                else:
+                    logger.warning("轮询失败 client=%s: %s - %s",
+                                   client_name, resp.status_code, resp.text[:200])
+            except Exception as e:
+                logger.warning("轮询异常 client=%s: %s", client_name, e)
+
+        # 全部失败
+        return None
 
     # ============================================
     # Token 刷新
@@ -246,30 +270,37 @@ class EpicAPIClient:
         """刷新 access_token（用 refresh_token 刷新，不需要重新授权）"""
         import base64
 
-        auth_header = base64.b64encode(
-            f"{EPIC_DEVICE_AUTH_CLIENT_ID}:{EPIC_DEVICE_AUTH_CLIENT_SECRET}".encode()
-        ).decode()
+        # 尝试多个 client
+        for client_id, client_secret, client_name in EPIC_CLIENTS:
+            try:
+                auth_header = base64.b64encode(
+                    f"{client_id}:{client_secret}".encode()
+                ).decode()
+                resp = await self.client.post(
+                    EPIC_TOKEN,
+                    headers={
+                        "Authorization": f"Basic {auth_header}",
+                        "Content-Type": "application/x-www-form-urlencoded",
+                    },
+                    data={
+                        "grant_type": "refresh_token",
+                        "refresh_token": credentials.refresh_token,
+                    },
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    credentials.access_token = data["access_token"]
+                    credentials.refresh_token = data.get("refresh_token", credentials.refresh_token)
+                    credentials.expires_at = time.time() + data.get("expires_in", 7200)
+                    logger.info("Access token 刷新成功 (client=%s)", client_name)
+                    return credentials
+                else:
+                    logger.warning("Token 刷新 client=%s 失败: %s - %s",
+                                   client_name, resp.status_code, resp.text[:200])
+            except Exception as e:
+                logger.warning("Token 刷新 client=%s 异常: %s", client_name, e)
 
-        resp = await self.client.post(
-            EPIC_TOKEN,
-            headers={
-                "Authorization": f"Basic {auth_header}",
-                "Content-Type": "application/x-www-form-urlencoded",
-            },
-            data={
-                "grant_type": "refresh_token",
-                "refresh_token": credentials.refresh_token,
-            },
-        )
-        if resp.status_code == 200:
-            data = resp.json()
-            credentials.access_token = data["access_token"]
-            credentials.refresh_token = data.get("refresh_token", credentials.refresh_token)
-            credentials.expires_at = time.time() + data.get("expires_in", 7200)
-            logger.info("Access token 刷新成功")
-            return credentials
-        logger.error("Token 刷新失败: %s - %s", resp.status_code, resp.text[:300])
-        raise Exception(f"Token 刷新失败: {resp.status_code}")
+        raise Exception("所有 client 都无法刷新 token")
 
     # ============================================
     # 免费游戏 API
