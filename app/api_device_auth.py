@@ -434,7 +434,9 @@ async def get_free_games():
 
     try:
         async with EpicAPIClient() as client:
+            logger.info("Fetching free games (credentials=%s)", "yes" if credentials else "no")
             games = await client.fetch_free_games_with_status(credentials)
+            logger.info("Got %d free games", len(games))
             return JSONResponse(content={
                 "success": True,
                 "games": [

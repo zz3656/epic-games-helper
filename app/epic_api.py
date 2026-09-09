@@ -45,6 +45,11 @@ EPIC_CATALOG_HOST = "catalog-public-service-prod06.ol.epicgames.com"
 EPIC_ENTITLEMENTS_URL = f"https://{EPIC_ENTITLEMENTS_HOST}/entitlement/api/account/{{account_id}}/entitlements"
 EPIC_CATALOG_BULK_URL = f"https://{EPIC_CATALOG_HOST}/catalog/api/shared/namespace/{{namespace}}/bulk/items"
 
+# User library (另一个查询接口 - 用于匹配 game library)
+# 参考 legendary: library-service.live.use1a.on.epicgames.com
+EPIC_LIBRARY_HOST = "library-service.live.use1a.on.epicgames.com"
+EPIC_LIBRARY_URL = f"https://{EPIC_LIBRARY_HOST}/library/api/public/items"
+
 # 游戏封面图片
 EPIC_IMAGE_BASE = "https://cdn1.epicgames.com/offer"
 
@@ -454,14 +459,18 @@ class EpicAPIClient:
     async def fetch_user_entitlements(
         self, credentials: DeviceAuthCredentials,
     ) -> set:
-        """查询用户已拥有的 entitlement names
+        """查询用户 library 中已拥有的游戏
 
-        参考 legendary 的 get_user_entitlements 接口：
-        GET https://entitlement-public-service-prod08.ol.epicgames.com/entitlement/api/account/{accountId}/entitlements?start=0&count=1000
+        使用 library-service API:
+        GET https://library-service.live.use1a.on.epicgames.com/library/api/public/items?includeMetadata=true
 
-        Returns:
-            set of entitlement names (e.g. {"FNBR_Athena_MTX", ...})
-            这些是 catalogItemId，需要与游戏信息匹配判断是否已拥有。
+        返回的 records 中每个 record 包含:
+        - catalogItemId: catalog item ID
+        - namespace: namespace
+        - appName: 应用名
+
+        我们的 free game 的 offer_id 是 "namespace/catalogItemId" 格式，
+        所以可以拼接 namespace + "/" + catalogItemId 来匹配。
         """
         # 刷新 token（如果过期）
         if credentials.is_expired():
@@ -470,43 +479,49 @@ class EpicAPIClient:
             except Exception:
                 pass
 
-        account_id = credentials.account_id
-        all_entitlement_names = set()
-        start = 0
-        page_size = 1000
+        owned_offer_ids = set()
+        cursor = None
 
         try:
             while True:
-                url = EPIC_ENTITLEMENTS_URL.format(account_id=account_id)
+                params = {"includeMetadata": "true"}
+                if cursor:
+                    params["cursor"] = cursor
+
                 resp = await self.client.get(
-                    url,
-                    params={"start": start, "count": page_size},
+                    EPIC_LIBRARY_URL,
+                    params=params,
                     headers={
                         "Authorization": f"Bearer {credentials.access_token}",
                     },
                 )
+
                 if resp.status_code != 200:
-                    logger.warning("entitlements 查询失败: %s - %s", resp.status_code, resp.text[:200])
+                    logger.warning("library 查询失败: %s - %s", resp.status_code, resp.text[:200])
                     break
 
                 data = resp.json()
-                if not data:
+                records = data.get("records") or []
+
+                for record in records:
+                    namespace = record.get("namespace") or ""
+                    catalog_item_id = record.get("catalogItemId") or ""
+                    if namespace and catalog_item_id:
+                        # 同时存储两种格式，以适配不同的 offer_id 格式
+                        owned_offer_ids.add(f"{namespace}/{catalog_item_id}")
+                        owned_offer_ids.add(catalog_item_id)
+                    elif catalog_item_id:
+                        owned_offer_ids.add(catalog_item_id)
+
+                response_metadata = data.get("responseMetadata") or {}
+                cursor = response_metadata.get("nextCursor")
+                if not cursor:
                     break
 
-                # data 是 entitlements 列表
-                for ent in data:
-                    name = ent.get("entitlementName") or ent.get("catalogItemId")
-                    if name:
-                        all_entitlement_names.add(name)
-
-                if len(data) < page_size:
-                    break
-                start += page_size
-
-            logger.info("查询到 %d 个用户 entitlement", len(all_entitlement_names))
-            return all_entitlement_names
+            logger.info("查询到 %d 个用户已拥有游戏（library API）", len(owned_offer_ids))
+            return owned_offer_ids
         except Exception as e:
-            logger.exception("查询 entitlements 异常")
+            logger.exception("查询 library 异常")
             return set()
 
     def _build_checkout_url(self, game: FreeGame) -> str:
