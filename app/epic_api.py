@@ -36,8 +36,8 @@ EPIC_DEVICE_AUTH_ALT = "https://account-public-service-prod03.ol.epicgames.com/a
 
 # Free games & purchase
 EPIC_FREE_GAMES = "https://store-site-backend-static.ak.epicgames.com/freeGamesPromotions"
-EPIC_PURCHASE_ORDER = "https://store.epicgames.com/purchase"
-EPIC_CHECKOUT_ORDER = "https://payment-website-pci.ol.epicgames.com/checkout/order"
+EPIC_PURCHASE_ORDER = "https://www.epicgames.com/store/purchase"
+EPIC_CHECKOUT_ORDER = "https://payment-website-pci.ol.epicgames.com/purchase/confirm-order"
 
 # OAuth client credentials
 # 参考 MixV2/EpicResearch 官方文档推荐的 fortnitePCGameClient
@@ -374,6 +374,32 @@ class EpicAPIClient:
             return []
 
     # ============================================
+    # XSRF Token
+    # ============================================
+
+    async def _get_xsrf_token(self, credentials: DeviceAuthCredentials) -> Optional[str]:
+        """获取 XSRF token（Epic 购买接口需要）
+
+        通过 GET /store 页面获取 cookie 中的 XSRF-TOKEN。
+        如果失败则返回 None（部分请求可能不需要）。
+        """
+        try:
+            resp = await self.client.get(
+                "https://www.epicgames.com/store",
+                headers={
+                    "Authorization": f"Bearer {credentials.access_token}",
+                },
+            )
+            # 从 cookies 中提取 XSRF-TOKEN
+            xsrf = self.client.cookies.get("XSRF-TOKEN")
+            if xsrf:
+                return xsrf
+        except Exception as e:
+            logger.warning("获取 XSRF token 失败: %s", e)
+
+        return None
+
+    # ============================================
     # 领取游戏
     # ============================================
 
@@ -388,15 +414,24 @@ class EpicAPIClient:
             credentials = await self.refresh_access_token(credentials)
 
         try:
-            # Epic Store 领取 endpoint
-            # 实际是创建一个 "order" 并 checkout
-            # 这里使用 purchase endpoint
-            resp = await self.client.post(
-                f"https://store.epicgames.com/purchase",
-                headers={
-                    "Authorization": f"Bearer {credentials.access_token}",
-                    "Content-Type": "application/json",
-                },
+            # Epic 购买流程（两步）：
+            # 1. POST https://www.epicgames.com/store/purchase → 创建订单
+            # 2. POST https://payment-website-pci.ol.epicgames.com/purchase/confirm-order → 确认订单
+            #
+            # 需要 XSRF token：先 GET /store 获取 cookie 中的 XSRF-TOKEN
+            xsrf_token = await self._get_xsrf_token(credentials)
+
+            purchase_headers = {
+                "Authorization": f"Bearer {credentials.access_token}",
+                "Content-Type": "application/json",
+            }
+            if xsrf_token:
+                purchase_headers["X-XSRF-TOKEN"] = xsrf_token
+
+            # 第一步：创建订单
+            purchase_resp = await self.client.post(
+                "https://www.epicgames.com/store/purchase",
+                headers=purchase_headers,
                 json={
                     "offers": [
                         {
@@ -408,54 +443,71 @@ class EpicAPIClient:
                 },
             )
 
-            # 读取响应内容（避免因解析失败而抛异常）
-            resp_text = resp.text
-            resp_status = resp.status_code
+            purchase_status = purchase_resp.status_code
+            purchase_text = purchase_resp.text
 
-            if resp_status == 409:
+            if purchase_status == 409:
                 return ("already_claimed", "已拥有")
 
-            elif resp_status == 401:
-                # token 过期，刷新一次后重试
+            if purchase_status == 401:
                 credentials = await self.refresh_access_token(credentials)
                 return await self.claim_game(credentials, game)
 
-            elif resp_status in (200, 201, 302, 303, 307, 308):
-                # 200/201: 正常成功
-                # 302/303/307/308: 重定向（已自动跟随），但最终响应也可能是 200
-                # 如果跟随后仍是 2xx/3xx，视为成功
-                try:
-                    data = resp.json()
-                    # 进一步提交订单（如果需要）
-                    order_id = data.get("orderId") or data.get("id")
-                    if order_id:
-                        confirm_resp = await self.client.post(
-                            f"https://store.epicgames.com/checkout/{order_id}/confirm",
-                            headers={
-                                "Authorization": f"Bearer {credentials.access_token}",
-                                "Content-Type": "application/json",
-                            },
-                            json={},
-                        )
-                        if confirm_resp.status_code in (200, 201):
-                            logger.info("游戏已领取: %s", game.title)
-                            return ("claimed", "已成功领取")
-                        else:
-                            logger.warning("订单确认失败 %s: %s %s", game.title, confirm_resp.status_code, confirm_resp.text[:200])
-                            return ("claimed", "已成功创建订单（确认失败，但游戏应已领取）")
+            # 读取响应内容（记录日志用）
+            purchase_data = None
+            try:
+                purchase_data = purchase_resp.json()
+            except Exception:
+                pass
 
-                    # 即便没有 order_id，返回 200 也算成功（Epic 通常返回 orderId）
-                    logger.info("游戏领取响应 200: %s %s", game.title, resp_text[:200] if resp_text else "")
-                    return ("claimed", "已成功领取")
-                except Exception:
-                    # 响应不是 JSON，但状态码是成功的，也可能是 Epic 的特殊响应
-                    # 如果之前自动跟随重定向后到达这里，说明请求已处理
-                    logger.info("游戏领取响应非 JSON 但状态成功: %s status=%d body=%s", game.title, resp_status, resp_text[:200] if resp_text else "(empty)")
-                    return ("claimed", "已成功领取")
+            # 尝试从不同字段获取 order_id
+            order_id = (
+                purchase_data.get("orderId")
+                or purchase_data.get("id")
+                or purchase_data.get("order_id")
+                or ""
+            )
 
-            else:
-                logger.warning("领取失败 %s: HTTP %s %s", game.title, resp_status, resp_text[:300] if resp_text else "(empty)")
-                return ("failed", f"领取失败: HTTP {resp_status}")
+            if not order_id:
+                logger.warning("购买响应未返回 order_id: status=%d body=%s", purchase_status, purchase_text[:300] if purchase_text else "(empty)")
+
+            # 第二步：确认订单（使用 payment-website-pci 端点）
+            if order_id:
+                confirm_headers = {
+                    "Authorization": f"Bearer {credentials.access_token}",
+                    "Content-Type": "application/json",
+                }
+                if xsrf_token:
+                    confirm_headers["X-XSRF-TOKEN"] = xsrf_token
+
+                confirm_resp = await self.client.post(
+                    "https://payment-website-pci.ol.epicgames.com/purchase/confirm-order",
+                    headers=confirm_headers,
+                    json={
+                        "order_id": order_id,
+                    },
+                )
+
+                confirm_status = confirm_resp.status_code
+
+                if confirm_status in (200, 201):
+                    logger.info("游戏领取成功: %s (order_id=%s)", game.title, order_id)
+                    return ("claimed", "已成功领取")
+                else:
+                    logger.warning("订单确认失败 %s: status=%d body=%s",
+                                   game.title, confirm_status,
+                                   confirm_resp.text[:300] if confirm_resp.text else "(empty)")
+                    return ("failed", f"订单确认失败: HTTP {confirm_status}")
+
+            # 如果没有 order_id 但有 200 状态码（Epic 可能直接成功）
+            if purchase_status in (200, 201):
+                logger.info("游戏领取响应 200: %s", game.title)
+                return ("claimed", "已成功领取")
+
+            # 其他情况
+            logger.warning("领取失败 %s: HTTP %s %s",
+                           game.title, purchase_status, purchase_text[:300] if purchase_text else "(empty)")
+            return ("failed", f"领取失败: HTTP {purchase_status}")
         except Exception as e:
             logger.exception("领取异常: %s", game.title)
             return ("failed", f"领取异常: {e}")
