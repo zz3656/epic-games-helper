@@ -1,56 +1,50 @@
-# 🎮 Epic Games 免费游戏自动领取
+# 🎮 Epic Games Free Games Auto-Claimer
 
-基于 **Docker + Playwright** 的 Epic Games 周免游戏自动领取服务。
+> Auto-claim free games from Epic Games Store weekly, powered by **Docker + Playwright** with a clean web UI and zero credential retention.
 
-## ✨ 功能特性
+## ✨ Features
 
-| 功能 | 说明 |
-|------|------|
-| 🌐 **Web 可视化界面** | 浏览器打开即用，账号密码可视化输入 |
-| 🔓 **立即领取** | 每次手动输入账号密码，领取完即清，零留存 |
-| 🔁 **自动领取** | 输入一次，每周自动跑；Fernet (AES-128-CBC) 加密存储 |
-| 🐳 **零配置启动** | 首次启动自动生成密钥，无需手动创建 `.env` |
-| ⏰ **可调度** | 支持配置每周任意时间触发（默认周四 17:00 北京时间） |
-| 📊 **历史记录** | 查看过往领取结果（已脱敏） |
-| 🛡️ **安全加固** | 容器无特权模式、资源限制、加密文件 0600 权限 |
+| Feature | Description |
+|---------|-------------|
+| 🌐 **Web UI** | Open in browser, no CLI needed |
+| 🔓 **One-time Claim** | Enter credentials manually each time; cleared after use |
+| 🔁 **Auto-Claim** | Enter once, runs weekly automatically; Fernet (AES-128-CBC) encrypted storage |
+| 🐳 **Zero-config Start** | `EPIC_MASTER_KEY` auto-generated on first run |
+| ⏰ **Scheduler** | Configurable weekly schedule (default: Thursday 17:00 Beijing time) |
+| 📊 **History** | Track past claim results (sanitized) |
+| 🛡️ **Secure by Design** | Privileged containers blocked, resource limits, `0600` permission on encrypted files |
+| 🖥️ **VNC Support** | Optional VNC for manual hCaptcha solving — accessible through the same port |
 
-## 🚀 快速开始
+## 🚀 Quick Start
 
-### 1. 启动
+### 1. Pull & Run
 
 ```bash
 docker compose up -d
 ```
 
-> 💡 **无需手动创建 `.env` 文件！** 容器首次启动时会自动生成 `EPIC_MASTER_KEY` 并保存到 `./data/.env`。
+> 💡 **No `.env` needed!** The container auto-generates `EPIC_MASTER_KEY` on first run and stores it in `./data/.env`.
 
-查看生成的密钥：
+Open in browser: **http://localhost:8000**
 
-```bash
-docker compose logs | grep EPIC_MASTER_KEY
-# 或直接查看文件：
-cat ./data/.env
-```
+### 2. Save Credentials (One-time Setup)
 
-打开：**http://localhost:8000**
+In the Web UI under **"💾 Save Credentials (Encrypted)"**:
+1. Enter your Epic Games email and password
+2. Check "Enable weekly auto-claim after saving"
+3. Click Save
 
-### 3. 启用自动领取（一次性配置）
+After that, the service automatically logs in and claims free games every week (default: Thursday 17:00 Beijing time).
 
-在 Web 界面的 **"💾 保存凭证（加密）"** 区块：
-1. 输入 Epic 账号密码
-2. 勾选"保存后启用每周自动领取"
-3. 点击保存
+### 3. Manage Auto-Claim
 
-之后每周定时（默认周四 17:00 北京时间）会自动登录并领取。
+- **Disable**: Web UI → toggle switch
+- **Delete credentials**: Web UI → 🗑 "Delete Credentials" button
+- **View history**: Web UI → history table
 
-### 4. 不想用了？
+### 4. Docker Compose Configuration
 
-- 关闭开关：Web 界面 → "自动领取开关"
-- 删除凭证：Web 界面 → "🗑 删除凭证" 按钮
-
-### 5. Docker Compose 配置示例
-
-默认配置（不启用 VNC）：
+**Basic (no VNC):**
 
 ```yaml
 services:
@@ -74,7 +68,7 @@ services:
       - no-new-privileges:true
 ```
 
-启用 VNC（手动验证 hCaptcha）：
+**With VNC (for manual hCaptcha solving):**
 
 ```yaml
 services:
@@ -82,8 +76,8 @@ services:
     image: zz3656/epic-games-claimer:latest
     container_name: epic-games-claimer
     restart: unless-stopped
-    # 仅需 8000 端口：API 和 VNC 都通过同一个端口访问
-    # VNC 嵌入式访问: http://服务器IP:8000/vnc
+    # Single port: both API and VNC share port 8000
+    # VNC URL: http://server-ip:8000/vnc-viewer
     ports:
       - "8000:8000"
     environment:
@@ -92,8 +86,8 @@ services:
       - SCHEDULE_HOUR=17
       - HEADLESS=true
       - AUTO_CLAIM_ENABLED=true
-      - ENABLE_VNC=true
-      # - VNC_PASSWORD=yourpassword    # 可选
+      - ENABLE_VNC=true        # Enable VNC server
+      # - VNC_PASSWORD=yourpw  # Optional: set VNC password
     volumes:
       - ./logs:/app/logs
       - ./screenshots:/app/screenshots
@@ -102,156 +96,185 @@ services:
       - no-new-privileges:true
 ```
 
-## 🔐 隐私与安全
+> 📌 **VNC Access**: Once `ENABLE_VNC=true` is set, open the VNC viewer at `http://your-host:8000/vnc-viewer` in a new browser tab. Click "Start Claim" in the main UI first — the Chrome window will appear during the claim task. Solve any hCaptcha manually in the VNC window.
 
-### 数据流
+## 🔐 Privacy & Security
+
+### Data Flow
 
 ```
-用户浏览器
-   │ HTTPS (账号密码明文)
+User Browser
+   │ HTTPS (credentials in memory)
    ▼
-FastAPI 进程
+FastAPI Process
    │
-   │ Fernet.encrypt()  ←  EPIC_MASTER_KEY 来自 .env
+   │ Fernet.encrypt()  ←  EPIC_MASTER_KEY from .env
    ▼
-/app/data/credentials.enc   ← 密文 (0600 权限)
+/app/data/credentials.enc   ←  Ciphertext (0600 permissions)
    ▲
-   │ Fernet.decrypt() (每周定时触发)
+   │ Fernet.decrypt() (weekly scheduled trigger)
    │
    ▼
-内存 (领取流程)
+In-memory (during claim)
    │
-   │ 流程结束后 clear()
+   │ Cleared after claim
    ▼
-引用置 None → GC 回收
+Reference set to None → GC
 ```
 
-### 加密细节
+### Encryption Details
 
-- **算法**：Fernet（**AES-128-CBC** + HMAC-SHA256）
-- **文件权限**：`0600`（仅容器内 root 可读）
-- **密钥来源**：`.env` 中的 `EPIC_MASTER_KEY`（不入 git）
+- **Algorithm**: Fernet (**AES-128-CBC** + HMAC-SHA256)
+- **File Permissions**: `0600` (root-only in container)
+- **Key Source**: `EPIC_MASTER_KEY` in `.env` (never committed)
 
-### 威胁模型
+### Threat Model
 
-| 攻击场景 | 后果 |
-|---------|------|
-| 攻击者拿到 `credentials.enc` 但无 key | 无法解密 → 安全 |
-| 攻击者拿到 `credentials.enc` + key | ⚠️ 完全泄露 |
-| 攻击者能 attach 到运行中的容器进程 | 进程内明文密码可见（仅运行时） |
-| 日志泄露 | 账号密码永不写日志（已脱敏） |
+| Scenario | Outcome |
+|----------|---------|
+| Attacker gets `credentials.enc` without key | 🔒 Cannot decrypt — safe |
+| Attacker gets `credentials.enc` + key | ⚠️ Full credential leak |
+| Attacher attaches to running container | Process in-memory plaintext (runtime only) |
+| Log leak | Credentials never written to logs (sanitized) |
 
-### ⚠️ 重要提醒
+### ⚠️ Important
 
-- **EPIC_MASTER_KEY 是唯一的防线**，请：
-  - 用强密码保护的密码管理器保管
-  - 不要贴到聊天/issue/截图里
-  - 定期更换（换 key 后需重新输入账号密码保存）
-- 如果怀疑 key 泄露 → 立刻删除凭证 + 换 key + 改 Epic 密码
-- 推荐用 Epic 小号而非主力号
+- **`EPIC_MASTER_KEY` is your only line of defense**. Protect it with a password manager, never share it in chats/issues/screenshots, and rotate periodically (changing the key requires re-saving credentials).
+- If key leak is suspected: delete credentials → change key → change Epic password.
+- **Recommend using a secondary Epic account**, not your main account.
 
-## 📁 项目结构
+## 📁 Project Structure
 
 ```
 epicgames/
 ├── app/
-│   ├── main.py                # FastAPI 入口 + API 路由
-│   ├── claimer.py             # Playwright 领取核心
-│   ├── scheduler.py           # APScheduler 定时调度
-│   ├── credential_store.py    # 🔒 Fernet 加密凭证存取
-│   ├── storage.py             # 结果存储（白名单字段）
-│   └── config.py              # 环境变量配置
+│   ├── main.py                # FastAPI entry + API routes
+│   ├── claimer.py             # Playwright claim core
+│   ├── claimer_login.py       # Login logic
+│   ├── claimer_login_form.py  # Form filling
+│   ├── claimer_login_post.py  # POST submission
+│   ├── claimer_browser.py     # Browser management
+│   ├── claimer_games.py       # Game fetch & claim
+│   ├── claimer_captcha.py     # Captcha detection
+│   ├── scheduler.py           # APScheduler cron
+│   ├── credential_store.py    # 🔒 Fernet encrypted store
+│   ├── storage.py             # Result storage
+│   ├── config.py              # Environment config
+│   ├── api_vnc.py             # VNC status + screenshots API
+│   ├── api_vnc_ws.py          # VNC WebSocket proxy
+│   └── static/                # Frontend assets + noVNC
 ├── scripts/
-│   ├── build-and-run.sh       # 本地构建脚本
-│   └── entrypoint.sh          # 🐳 容器启动入口（自动生成密钥）
+│   ├── build-and-run.sh
+│   └── entrypoint.sh          # 🐳 Entrypoint (auto-keygen, VNC setup)
 ├── Dockerfile
 ├── docker-compose.yml
-├── .env.example               # 配置模板
-├── .env                       # 密钥文件（自动生成，gitignore）
+├── .env.example
+├── .env                       # Auto-generated, gitignored
 ├── requirements.txt
-├── logs/                      # 领取日志
-├── screenshots/               # 异常截图
-└── data/                      # 凭证密文持久化目录
+├── logs/                      # Claim logs
+├── screenshots/               # Debug screenshots
+└── data/                      # Encrypted credentials persistence
 ```
 
-## ⚙️ 配置
+## ⚙️ Configuration
 
-所有配置通过环境变量管理。容器首次启动时会自动生成 `EPIC_MASTER_KEY` 并写入 `./data/.env`，后续启动自动读取。
+All configuration via environment variables. `EPIC_MASTER_KEY` is auto-generated on first run and stored in `./data/.env`.
 
-### 环境变量
-
-| 变量 | 默认 | 说明 |
-|------|------|------|
-| `EPIC_MASTER_KEY` | *自动生成* | Fernet 密钥（首次运行时生成） |
-| `TZ` | `Asia/Shanghai` | 时区 |
-| `SCHEDULE_DAY` | `thu` | 周几触发（mon-sun） |
-| `SCHEDULE_HOUR` | `17` | 触发小时 |
-| `SCHEDULE_MINUTE` | `0` | 触发分钟 |
-| `HEADLESS` | `true` | 浏览器无头模式 |
-| `LOG_LEVEL` | `INFO` | 日志级别 |
-| `AUTO_CLAIM_ENABLED` | `false` | 启动时自动开启自动领取 |
-| `ENABLE_VNC` | `false` | 启动 VNC 服务（手动验证 hCaptcha 用） |
-| `VNC_PASSWORD` | *(空)* | VNC 访问密码（不设置则无密码） |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `EPIC_MASTER_KEY` | *auto-generated* | Fernet encryption key |
+| `TZ` | `Asia/Shanghai` | Timezone |
+| `SCHEDULE_DAY` | `thu` | Day to run (mon-sun) |
+| `SCHEDULE_HOUR` | `17` | Hour (0-23) |
+| `SCHEDULE_MINUTE` | `0` | Minute (0-59) |
+| `HEADLESS` | `true` | Headless browser mode |
+| `LOG_LEVEL` | `INFO` | Logging level |
+| `AUTO_CLAIM_ENABLED` | `false` | Enable auto-claim on startup |
+| `ENABLE_VNC` | `false` | Start VNC server (for hCaptcha) |
+| `VNC_PASSWORD` | *(empty)* | VNC password (empty = no auth) |
 
 ## 🛠️ API
 
-启动后访问 **http://localhost:8000/docs** 查看完整 API 文档。
+API docs at **http://localhost:8000/docs**.
 
-| 接口 | 方法 | 说明 |
-|------|------|------|
-| `/api/health` | GET | 健康检查 + 状态 |
-| `/api/claim` | POST | 立即领取（明文账号密码） |
-| `/api/credentials` | POST | 保存加密凭证 |
-| `/api/credentials` | DELETE | 删除凭证 |
-| `/api/credentials/status` | GET | 查询凭证状态 |
-| `/api/auto-claim/toggle` | POST | 开关自动领取 |
-| `/api/history` | GET | 历史记录 |
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/health` | GET | Health check |
+| `/api/claim` | POST | Immediate claim (plaintext creds) |
+| `/api/claim/verification` | POST | Submit email verification code |
+| `/api/credentials` | POST | Save encrypted credentials |
+| `/api/credentials` | DELETE | Delete credentials |
+| `/api/credentials/status` | GET | Check credential status |
+| `/api/auto-claim/toggle` | POST | Toggle auto-claim |
+| `/api/history` | GET | Claim history |
+| `/api/vnc/status` | GET | VNC server status |
+| `/vnc-viewer` | GET | Embedded VNC viewer page |
+| `/vnc-ws` | WS | VNC WebSocket proxy |
 
-## 🐛 故障排查
+## 🐛 Troubleshooting
 
-### 1. 登录失败
+### 1. Login Failed
 
-Epic 经常改版或触发人机验证：
-- 设置 `HEADLESS=false` 调试（需要 X11 转发，配置复杂）
-- 检查 `/app/screenshots/login_failed_*.png` 截图
-- 查看 `docker compose logs -f`
+Epic Games frequently updates their site or triggers CAPTCHA:
+- Check `/app/screenshots/login_failed_*.png` for debug screenshots
+- Review `docker compose logs -f`
+- Set `HEADLESS=false` and enable VNC for manual troubleshooting
 
-### 1.5. hCaptcha 验证
+### 2. hCaptcha Verification
 
-如果 Epic 弹出 hCaptcha 图形验证，Web 界面会明确提示三种情况：
+If Epic presents an hCaptcha during login, the Web UI will show a clear prompt:
 
-1. **账号或密码错误**（🔑）：检查输入是否正确
-2. **需要 hCaptcha 验证**（🧩）：需要手动验证
-   - **启用 VNC 后**：领取失败时点不蓝色「🎯 点击这里打开 noVNC」按钮，新窗口打开 noVNC 后手动完成 hCaptcha
-   - **未启用 VNC**：按 Web 界面提示的步骤修改 docker-compose.yml，添加 `ENABLE_VNC=true` 和 `6080:6080` 端口，重启后重新领取
+1. **Wrong credentials** (🔑): Verify email and password
+2. **hCaptcha required** (🧩): Manual solving needed
+   - With VNC enabled: Click the blue **"🎯 Click to open noVNC"** button in the failure notification
+   - A new tab opens the VNC viewer — manually solve the CAPTCHA in the Chrome window
+   - The claim task will auto-resume (waits up to 120s)
 
-详细配置参见上文「Docker Compose 配置示例」一节。
+Ensure `ENABLE_VNC=true` is set in your environment before starting.
 
-### 2. Master key 变更导致凭证无法解密
+### 3. VNC Shows Black Screen
+
+- Verify `ENABLE_VNC=true` is set in your container environment
+- Check container logs: `docker compose logs | grep VNC`
+- You should see `ENABLE_VNC=true - starting VNC server...` and `VNC setup complete.`
+- If not present, the VNC server was not started — add the environment variable and restart
+
+### 4. Master Key Changed — Credentials Can't Be Decrypted
 
 ```
-ERROR 解密失败：master key 与凭证不匹配
+ERROR Decryption failed: master key mismatch
 ```
 
-解决：删除旧凭证 → Web 界面"删除凭证"，再重新保存。
+Fix: Delete old credentials → Web UI "Delete Credentials" → Re-save with same account.
 
-### 3. 容器重启后自动领取失败
+### 5. Want to Customize the Master Key?
 
-检查 `./data/.env` 中的 `EPIC_MASTER_KEY` 是否持久（持久化在宿主机 `data` 目录）。
-
-### 4. 想自定义密钥？
-
-容器首次运行后，编辑 `./data/.env` 修改 `EPIC_MASTER_KEY`，然后重启：
+After first run, edit `./data/.env` to set `EPIC_MASTER_KEY`, then restart:
 ```bash
 docker compose restart
 ```
 
-## ⚠️ 免责声明
+## ⚠️ Disclaimer
 
-- 本项目仅供学习交流，请遵守 [Epic Games 服务条款](https://www.epicgames.com/site/en-US/terms-of-service)
-- 频繁自动操作可能触发账号风控
-- 作者不对账号被封、数据丢失等任何损失负责
+- This project is for educational purposes only. Please comply with [Epic Games Terms of Service](https://www.epicgames.com/site/en-US/terms-of-service).
+- Frequent automated actions may trigger account risk controls.
+- The author is not responsible for any account bans, data loss, or other damages.
 
 ## 📝 License
 
 MIT
+
+## 🏗️ Architecture
+
+```
+┌──────────────┐     ┌────────────────┐     ┌──────────────────┐
+│  User Browser │────▶│  FastAPI (:8000) │────▶│  Chromium (Playwright) │
+└──────────────┘     │                │     └──────────────────┘
+                     │  • REST API     │     ┌──────────────────┐
+                     │  • Web UI       │────▶│  VNC Server (:5900)│
+                     │  • VNC WS Proxy │────▶│  (Xvfb + x11vnc)  │
+                     │  • noVNC page   │     └──────────────────┘
+                     └────────────────┘
+```
+
+Single port architecture: all access (API, Web UI, VNC viewer) goes through port **8000**. No additional port mappings needed for VNC.
