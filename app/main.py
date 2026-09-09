@@ -24,6 +24,11 @@ from app.credential_store import CredentialStore
 from app.scheduler import ClaimScheduler
 from app.storage import ResultStore
 
+# ============== 数据模型 ==============
+class AutoClaimToggle(BaseModel):
+    """开关自动领取请求体"""
+    enabled: bool
+
 # 日志
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -133,11 +138,6 @@ async def toggle_auto_claim(req: AutoClaimToggle):
 
 
 # ----- 历史 -----
-
-# ============== 数据模型 ==============
-class AutoClaimToggle(BaseModel):
-    enabled: bool
-
 
 @app.get("/api/history")
 async def history(limit: int = 20):
