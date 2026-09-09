@@ -145,10 +145,9 @@ class LoginHandler:
     def __init__(self, parent):
         self.parent = parent
         # hCaptcha 处理（拆分到 claimer_captcha.py）
-        from app.claimer_captcha import try_solve_hcaptcha, wait_for_manual_captcha_solve, is_vnc_enabled
+        from app.claimer_captcha import try_solve_hcaptcha, wait_for_manual_captcha_solve
         self._try_solve_hcaptcha = try_solve_hcaptcha
         self._wait_for_manual_captcha_solve = wait_for_manual_captcha_solve
-        self._vnc_enabled = is_vnc_enabled
 
     def _classify_error(self, page_text: str, current_url: str) -> LoginResult:
         """根据页面文本和 URL 分类失败原因"""
@@ -356,43 +355,38 @@ class LoginHandler:
                         screenshot_tag="verification_required",
                     )
 
-            # 检查 hCaptcha 等图形验证码（同时检查主页和 target iframe）
+            # 检查 hCaptcha 等图形验证码
             from app.claimer_login_post import has_hcaptcha_iframe, detect_hcaptcha_in_text
             has_captcha = await has_hcaptcha_iframe(page, target)
             has_captcha_text = detect_hcaptcha_in_text(combined_text)
 
             if has_captcha or has_captcha_text:
-                logger.warning("检测到 hCaptcha，尝试自动点击验证 checkbox")
-                # 尝试自动点击 hCaptcha checkbox
+                logger.warning("检测到 hCaptcha，尝试自动处理...")
+
+                # 尝试自动点击 checkbox
                 captcha_clicked = await self._try_solve_hcaptcha(page, target)
                 if captcha_clicked:
-                    # 点击后等一段时间看看是否解决
-                    await asyncio.sleep(5)
-                    # 再次检查：是否还存在验证码表单
+                    # hCaptcha 自动点击后，等待其完成验证（低风险场景下自动通过）
+                    # 最多等待 15 秒，等待 iframe 消失（验证完成标志）
+                    await asyncio.sleep(3)  # 先等 3 秒让 hCaptcha JS 执行
                     still_captcha = await page.evaluate("""
                     () => !!document.querySelector('iframe[src*="hcaptcha"]')
                     """)
                     if not still_captcha:
-                        logger.info("hCaptcha 自动解决成功")
-                        # 验证后可能需要重新点击登录
+                        logger.info("hCaptcha 自动验证通过，重新提交登录")
                         await self.parent._click_first_available(
                             target, self.SUBMIT_BUTTON_SELECTORS
                         )
-                        await asyncio.sleep(2)
+                        await asyncio.sleep(3)
                         continue  # 重新检查结果
 
-                # 自动解决失败。
-                # 检查是否启用了 VNC，如果是，等待用户手动验证
-                if self._vnc_enabled():
-                    logger.warning("VNC 已启用，等待用户手动验证 hCaptcha（120秒）")
+                    # hCaptcha iframe 还在，但可能是图片验证型（需要人工）
+                    # 自动点击 + 短等待无法解决，返回需要人工处理
+                    logger.warning("hCaptcha 需要人工验证（图片选择），等待 120 秒")
                     await self.parent._save_screenshot(page, "login_captcha_waiting")
                     solved = await self._wait_for_manual_captcha_solve(page, timeout_seconds=120)
                     if solved:
-                        # VNC 手动验证 hCaptcha 后，等待足够长的时间让 Epic 服务端完成验证
-                        # hCaptcha 验证通过后需要等待 30 秒才能重新提交登录表单
-                        logger.info("hCaptcha 验证完成，等待 30 秒让服务端处理后再重新提交...")
-                        await asyncio.sleep(30)
-                        # 重新提交登录表单
+                        # 人工验证后重新提交
                         logger.info("重新提交登录表单")
                         await self.parent._click_first_available(
                             target, self.SUBMIT_BUTTON_SELECTORS
@@ -400,12 +394,12 @@ class LoginHandler:
                         await asyncio.sleep(3)
                         continue
 
-                # 自动解决失败，提示用户手动处理
-                logger.warning("hCaptcha 自动解决失败，需手动处理")
+                # 自动点击 checkbox 失败
+                logger.warning("hCaptcha 自动处理失败，需人工处理")
                 await self.parent._save_screenshot(page, "login_captcha")
                 return LoginResult(
                     status=LoginStatus.CAPTCHA_REQUIRED,
-                    reason="Epic 要求完成图形验证码 (hCaptcha)。如设置了 ENABLE_VNC=true，请通过 noVNC (6080 端口) 手动验证；否则等待几分钟后重试",
+                    reason="Epic 要求完成图形验证码 (hCaptcha)。请检查 /app/screenshots/ 中的截图，或手动在 Epic 网站登录一次以信任此设备",
                     screenshot_tag="login_captcha",
                 )
 
