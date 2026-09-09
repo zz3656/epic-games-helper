@@ -52,7 +52,7 @@ async def request_device_auth():
     """
     try:
         async with EpicAPIClient() as client:
-            device_code, user_code, verification_uri, expires_in = \
+            device_code, user_code, verification_uri, expires_in, client_used = \
                 await client.request_device_code()
 
         # 保存到内存，10 分钟后过期
@@ -185,7 +185,7 @@ async def test_request_device_code():
     from app.epic_api import EpicAPIClient
     try:
         async with EpicAPIClient() as client:
-            device_code, user_code, verification_uri, expires_in = \
+            device_code, user_code, verification_uri, expires_in, client_used = \
                 await client.request_device_code()
         return JSONResponse(content={
             "success": True,
@@ -194,6 +194,7 @@ async def test_request_device_code():
             "verification_uri_complete": f"{verification_uri}?code={user_code}" if "?" not in verification_uri else verification_uri,
             "expires_in": expires_in,
             "device_code_preview": device_code[:10] + "...",
+            "client_used": client_used,
         })
     except Exception as e:
         return JSONResponse(content={
