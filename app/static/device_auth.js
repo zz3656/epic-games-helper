@@ -1,7 +1,8 @@
-// ============ Device Auth 设备码授权 ============
+// ============ Device Auth 设备码授权 + 整合的"立即领取"和"自动领取" ============
 let deviceAuthPollTimer = null;
 let currentDeviceCode = null;
 
+// ============ 元素引用 ============
 const startDeviceAuthBtn = document.getElementById("start-device-auth-btn");
 const deleteDeviceAuthBtn = document.getElementById("delete-device-auth-btn");
 const cancelDeviceAuthBtn = document.getElementById("cancel-device-auth-btn");
@@ -15,7 +16,18 @@ const deviceAuthResult = document.getElementById("device-auth-result");
 const startDeviceAuthBtnText = startDeviceAuthBtn.querySelector(".btn-text");
 const startDeviceAuthBtnSpinner = startDeviceAuthBtn.querySelector(".btn-spinner");
 
-// 启动设备码授权
+// 整合的"立即领取"和"自动领取"区域
+const manualClaimSection = document.getElementById("manual-claim-section");
+const autoClaimSection = document.getElementById("auto-claim-section");
+const claimNowBtn = document.getElementById("claim-now-btn");
+const manualClaimResult = document.getElementById("manual-claim-result");
+const autoSwitch = document.getElementById("auto-switch");
+const autoStatusText = document.getElementById("auto-status-text");
+
+// 进度轮询定时器
+let claimProgressTimer = null;
+
+// ============ 启动设备码授权 ============
 startDeviceAuthBtn.addEventListener("click", async () => {
     startDeviceAuthBtn.disabled = true;
     startDeviceAuthBtnText.hidden = true;
@@ -36,7 +48,6 @@ startDeviceAuthBtn.addEventListener("click", async () => {
         deviceAuthFlow.hidden = false;
         deviceAuthPollMsg.textContent = "等待你在浏览器完成授权...";
 
-        // 开始轮询（每 3 秒）
         if (deviceAuthPollTimer) clearInterval(deviceAuthPollTimer);
         deviceAuthPollTimer = setInterval(() => pollDeviceAuth(data.device_code), 3000);
     } catch (err) {
@@ -44,11 +55,12 @@ startDeviceAuthBtn.addEventListener("click", async () => {
     } finally {
         startDeviceAuthBtn.disabled = false;
         startDeviceAuthBtnText.hidden = false;
+        startDeviceAuthBtnSpinner.hidden = false;  // 注意：这里要 hide
         startDeviceAuthBtnSpinner.hidden = true;
     }
 });
 
-// 轮询 device auth 状态
+// ============ 轮询 device auth 状态 ============
 async function pollDeviceAuth(deviceCode) {
     try {
         const resp = await fetch(`/api/device-auth/poll/${encodeURIComponent(deviceCode)}`);
@@ -56,7 +68,6 @@ async function pollDeviceAuth(deviceCode) {
         const status = data.status;
 
         if (status === "success") {
-            // 用户完成授权
             clearInterval(deviceAuthPollTimer);
             deviceAuthPollTimer = null;
             currentDeviceCode = null;
@@ -78,18 +89,13 @@ async function pollDeviceAuth(deviceCode) {
             deviceAuthPollTimer = null;
             deviceAuthFlow.hidden = true;
             showDeviceAuthResult({ success: false, error: data.message || "授权失败" });
-        } else {
-            // pending - 更新等待消息
-            if (data.user_code && verificationUriLink.href === "#") {
-                verificationUriLink.href = data.verification_uri_complete;
-            }
         }
     } catch (err) {
         console.warn("轮询失败:", err);
     }
 }
 
-// 取消授权
+// ============ 取消授权 ============
 cancelDeviceAuthBtn.addEventListener("click", async () => {
     if (deviceAuthPollTimer) clearInterval(deviceAuthPollTimer);
     deviceAuthPollTimer = null;
@@ -102,7 +108,7 @@ cancelDeviceAuthBtn.addEventListener("click", async () => {
     deviceAuthFlow.hidden = true;
 });
 
-// 撤销已保存的 device auth
+// ============ 撤销已保存的 device auth ============
 deleteDeviceAuthBtn.addEventListener("click", async () => {
     if (!confirm("确定撤销 Epic 设备授权吗？\n撤销后需要重新授权才能继续自动领取。")) return;
     try {
@@ -119,46 +125,201 @@ deleteDeviceAuthBtn.addEventListener("click", async () => {
     }
 });
 
-// 刷新 device auth 状态
+// ============ 立即领取（设备码已授权时） ============
+claimNowBtn.addEventListener("click", async () => {
+    const claimId = "manual-" + Date.now();
+    claimNowBtn.disabled = true;
+    claimNowBtn.querySelector(".btn-text").hidden = true;
+    claimNowBtn.querySelector(".btn-spinner").hidden = false;
+    manualClaimResult.hidden = true;
+
+    try {
+        const resp = await fetch("/api/device-auth/claim-now", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ claim_id: claimId }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+            showManualClaimResult({ error: data.detail || "领取失败" });
+            return;
+        }
+
+        // 开始轮询进度
+        if (claimProgressTimer) clearInterval(claimProgressTimer);
+        claimProgressTimer = setInterval(() => pollClaimProgress(claimId), 2000);
+        // 立即查一次
+        pollClaimProgress(claimId);
+    } catch (err) {
+        showManualClaimResult({ error: `网络错误: ${err.message}` });
+    }
+});
+
+async function pollClaimProgress(claimId) {
+    try {
+        const resp = await fetch(`/api/claim/progress/${claimId}`);
+        if (resp.status === 404) {
+            clearInterval(claimProgressTimer);
+            claimProgressTimer = null;
+            showManualClaimResult({ error: "任务不存在或已过期" });
+            claimNowBtn.disabled = false;
+            claimNowBtn.querySelector(".btn-text").hidden = false;
+            claimNowBtn.querySelector(".btn-spinner").hidden = true;
+            return;
+        }
+        const data = await resp.json();
+        // 显示进度
+        let progressHtml = `<div class="result-title">⏳ ${escapeHtml(data.step || "处理中...")}</div>`;
+        if (data.status === "done") {
+            clearInterval(claimProgressTimer);
+            claimProgressTimer = null;
+            claimNowBtn.disabled = false;
+            claimNowBtn.querySelector(".btn-text").hidden = false;
+            claimNowBtn.querySelector(".btn-spinner").hidden = true;
+            if (data.result) {
+                const r = data.result;
+                let gamesHtml = "";
+                if (r.games && r.games.length > 0) {
+                    gamesHtml = "<ul>" + r.games.map(g => {
+                        const icon = g.status === "claimed" ? "✅" : g.status === "already_claimed" ? "🔁" : "❌";
+                        return `<li>${icon} ${escapeHtml(g.title)} — ${escapeHtml(g.message || g.status)}</li>`;
+                    }).join("") + "</ul>";
+                }
+                const cls = r.success ? "success" : "failed";
+                progressHtml = `
+                    <div class="result-title">${r.success ? "✅ 领取完成" : "❌ 领取失败"}</div>
+                    ${r.error ? `<div class="result-error">${escapeHtml(r.error)}</div>` : ""}
+                    ${gamesHtml}
+                `;
+                manualClaimResult.className = `result ${cls}`;
+            } else if (data.step) {
+                manualClaimResult.className = `result failed`;
+                progressHtml = `<div class="result-title">${escapeHtml(data.step)}</div>`;
+            }
+            // 刷新历史
+            loadHistory();
+        } else {
+            manualClaimResult.className = `result info`;
+        }
+        manualClaimResult.innerHTML = progressHtml;
+        manualClaimResult.hidden = false;
+    } catch (err) {
+        console.warn("进度轮询失败:", err);
+    }
+}
+
+function showManualClaimResult(data) {
+    manualClaimResult.hidden = false;
+    manualClaimResult.className = `result ${data.error ? "failed" : "success"}`;
+    manualClaimResult.innerHTML = `<div class="result-title">${escapeHtml(data.error || "完成")}</div>`;
+    claimNowBtn.disabled = false;
+    claimNowBtn.querySelector(".btn-text").hidden = false;
+    claimNowBtn.querySelector(".btn-spinner").hidden = true;
+}
+
+// ============ 自动领取开关 ============
+autoSwitch.addEventListener("change", async () => {
+    const enabled = autoSwitch.checked;
+    try {
+        const resp = await fetch("/api/auto-claim/toggle", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ enabled }),
+        });
+        const data = await resp.json();
+        if (resp.ok) {
+            updateAutoStatus(data.auto_claim_enabled);
+        } else {
+            autoSwitch.checked = !enabled;
+            alert(data.detail || "操作失败");
+        }
+    } catch (err) {
+        autoSwitch.checked = !enabled;
+        alert(`网络错误: ${err.message}`);
+    }
+});
+
+function updateAutoStatus(enabled) {
+    autoSwitch.checked = enabled;
+    autoStatusText.textContent = enabled ? "已启用" : "已关闭";
+    autoStatusText.className = `auto-status ${enabled ? "on" : "off"}`;
+}
+
+// ============ 刷新状态（统一入口） ============
 async function refreshDeviceAuthStatus() {
     try {
-        const resp = await fetch("/api/device-auth/status");
-        const data = await resp.json();
-        if (data.device_auth_configured) {
+        const [authResp, autoResp] = await Promise.all([
+            fetch("/api/device-auth/status"),
+            fetch("/api/credentials/status"),
+        ]);
+        const authData = await authResp.json();
+        const autoData = await autoResp.json();
+
+        if (authData.device_auth_configured) {
             deviceAuthStatus.classList.add("configured");
             deviceAuthStatus.classList.remove("empty");
             deviceAuthStatusText.innerHTML = "✓ 已通过 Epic 设备码授权（永不过期）";
             deleteDeviceAuthBtn.hidden = false;
             startDeviceAuthBtn.hidden = true;
+            // 显示立即领取和自动领取
+            manualClaimSection.hidden = false;
+            autoClaimSection.hidden = false;
         } else {
             deviceAuthStatus.classList.remove("configured");
             deviceAuthStatus.classList.add("empty");
             deviceAuthStatusText.innerHTML = "⚠ 未授权（每周需要手动重新登录）";
             deleteDeviceAuthBtn.hidden = true;
             startDeviceAuthBtn.hidden = false;
+            manualClaimSection.hidden = true;
+            autoClaimSection.hidden = true;
         }
+        updateAutoStatus(autoData.auto_claim_enabled);
     } catch (err) {
-        console.error("Device auth 状态刷新失败:", err);
+        console.error("状态刷新失败:", err);
     }
 }
 
-// 显示结果
 function showDeviceAuthResult(data) {
     deviceAuthResult.hidden = false;
     deviceAuthResult.className = `result ${data.success ? "success" : "failed"}`;
     if (data.success) {
-        deviceAuthResult.innerHTML = `
-            <div class="result-title">✓ ${escapeHtml(data.message || "成功")}</div>
-        `;
+        deviceAuthResult.innerHTML = `<div class="result-title">✓ ${escapeHtml(data.message || "成功")}</div>`;
     } else {
-        deviceAuthResult.innerHTML = `
-            <div class="result-title">❌ ${escapeHtml(data.error || "失败")}</div>
-        `;
+        deviceAuthResult.innerHTML = `<div class="result-title">❌ ${escapeHtml(data.error || "失败")}</div>`;
     }
 }
 
-// 页面加载时初始化
-refreshDeviceAuthStatus();
+// ============ 历史记录 ============
+async function loadHistory() {
+    try {
+        const resp = await fetch("/api/history?limit=10");
+        const data = await resp.json();
+        const list = document.getElementById("history-list");
+        if (!data.items || data.items.length === 0) {
+            list.innerHTML = `<p class="hint">暂无记录</p>`;
+            return;
+        }
+        list.innerHTML = data.items.map(item => {
+            const cls = item.success ? "success" : "failed";
+            const gamesText = (item.games || []).map(g => {
+                const icon = g.status === "claimed" ? "✅" : g.status === "already_claimed" ? "🔁" : "❌";
+                return `<div>${icon} ${escapeHtml(g.title)} — ${escapeHtml(g.message || g.status)}</div>`;
+            }).join("");
+            return `
+                <div class="history-item ${cls}">
+                    <div class="history-time">${escapeHtml(item.started_at || "")}</div>
+                    <div class="history-username">${escapeHtml(item.username || "")}</div>
+                    ${item.error ? `<div class="history-error">${escapeHtml(item.error)}</div>` : ""}
+                    ${gamesText}
+                </div>
+            `;
+        }).join("");
+    } catch (err) {
+        console.error("加载历史失败:", err);
+    }
+}
+
+document.getElementById("refresh-history").addEventListener("click", loadHistory);
 
 // ============ 调试按钮 ============
 const debugOutput = document.getElementById("device-auth-debug-output");
@@ -171,6 +332,17 @@ document.getElementById("test-free-games-btn").addEventListener("click", async (
     debugOutput.textContent = "⏳ 测试中...";
     try {
         const resp = await fetch("/api/device-auth/test/free-games", { method: "POST" });
+        const data = await resp.json();
+        setDebugOutput(data);
+    } catch (err) {
+        setDebugOutput({ success: false, error: err.message });
+    }
+});
+
+document.getElementById("test-free-games-raw-btn").addEventListener("click", async () => {
+    debugOutput.textContent = "⏳ 获取原始数据...";
+    try {
+        const resp = await fetch("/api/device-auth/test/free-games-raw", { method: "POST" });
         const data = await resp.json();
         setDebugOutput(data);
     } catch (err) {
@@ -200,3 +372,6 @@ document.getElementById("test-claim-btn").addEventListener("click", async () => 
         setDebugOutput({ success: false, error: err.message });
     }
 });
+
+// 页面加载时初始化
+refreshDeviceAuthStatus();

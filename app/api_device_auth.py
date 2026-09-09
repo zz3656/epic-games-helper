@@ -146,6 +146,125 @@ async def delete_device_auth_endpoint():
     raise HTTPException(status_code=500, detail="撤销失败")
 
 
+# 用于 /api/device-auth/claim-now 的进度追踪
+from typing import Dict, Any
+import asyncio as _asyncio
+
+_claim_progress: Dict[str, Dict[str, Any]] = {}
+_claim_results: Dict[str, Dict[str, Any]] = {}
+
+
+class DeviceAuthClaimRequest(BaseModel):
+    claim_id: str
+
+
+@router.post("/api/device-auth/claim-now")
+async def claim_now_with_device_auth(req: DeviceAuthClaimRequest):
+    """使用 device auth token 立即领取（基于 device auth 模式，无需账号密码）
+
+    与 /api/claim 的区别：本接口使用 device auth token 绕过浏览器，完全 HTTP API 调用。
+    """
+    from app.epic_api import EpicAPIClient, FreeGame as ApiFreeGame
+
+    if not _credential_store or not _credential_store.has_device_auth():
+        raise HTTPException(status_code=400, detail="未配置 device auth，请先完成设备码授权")
+
+    claim_id = req.claim_id
+    _claim_progress[claim_id] = {
+        "claim_id": claim_id,
+        "step": "启动中...",
+        "status": "active",
+    }
+
+    async def _do_claim():
+        credentials = _credential_store.load_device_auth()
+        if not credentials:
+            _claim_progress[claim_id] = {"step": "读取 device auth 失败", "status": "done"}
+            return
+
+        try:
+            _claim_progress[claim_id]["step"] = "📦 获取本周免费游戏..."
+            _claim_progress[claim_id]["status"] = "active"
+
+            async with EpicAPIClient() as client:
+                free_games = await client.fetch_free_games()
+
+                if not free_games:
+                    _claim_results[claim_id] = {
+                        "success": True,
+                        "error": "本周暂无免费游戏",
+                        "games": [],
+                    }
+                    _claim_progress[claim_id] = {"step": "本周暂无免费游戏", "status": "done"}
+                    return
+
+                _claim_progress[claim_id]["step"] = f"发现 {len(free_games)} 款免费游戏，开始领取"
+
+                results = []
+                for i, game in enumerate(free_games, 1):
+                    _claim_progress[claim_id]["step"] = (
+                        f"🎯 领取 [{i}/{len(free_games)}]: {game.title}"
+                    )
+                    status, message = await client.claim_game(credentials, game)
+                    results.append({
+                        "title": game.title,
+                        "offer_id": game.offer_id,
+                        "url": game.url,
+                        "status": status,
+                        "message": message,
+                    })
+
+                success = all(g["status"] in ("claimed", "already_claimed") for g in results)
+                _claim_results[claim_id] = {
+                    "success": success,
+                    "username": f"DeviceAuth:{credentials.account_id[:6]}***",
+                    "error": None if success else "部分或全部游戏领取失败",
+                    "games": results,
+                }
+                _claim_progress[claim_id] = {
+                    "step": f"{'✅' if success else '❌'} 领取{'成功' if success else '完成'}",
+                    "status": "done",
+                }
+        except Exception as e:
+            logger.exception("device auth 领取失败")
+            _claim_results[claim_id] = {
+                "success": False,
+                "error": f"异常: {type(e).__name__}: {e}",
+                "games": [],
+            }
+            _claim_progress[claim_id] = {"step": f"异常: {e}", "status": "done"}
+
+    _asyncio.create_task(_do_claim())
+    return JSONResponse(content={"claim_id": claim_id, "message": "领取任务已启动"})
+
+
+@router.get("/api/claim/progress/{claim_id}")
+async def claim_progress_endpoint(claim_id: str):
+    """查询领取进度（复用 /api/claim 的进度接口）"""
+    progress = _claim_progress.get(claim_id)
+    if not progress:
+        result_dict = _claim_results.get(claim_id)
+        if result_dict:
+            _claim_results.pop(claim_id, None)
+            return JSONResponse(content={
+                "claim_id": claim_id,
+                "step": "领取完成",
+                "status": "done",
+                "result": result_dict,
+            })
+        raise HTTPException(status_code=404, detail="任务不存在或已过期")
+
+    if progress.get("status") == "done":
+        result_dict = _claim_results.get(claim_id)
+        if result_dict:
+            progress["result"] = result_dict
+        _claim_progress.pop(claim_id, None)
+        if result_dict:
+            _claim_results.pop(claim_id, None)
+
+    return JSONResponse(content=progress)
+
+
 @router.get("/api/device-auth/status")
 async def device_auth_status():
     """查询 device auth 状态"""

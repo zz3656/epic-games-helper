@@ -10,46 +10,13 @@
     <div class="container">
         <header>
             <h1>🎮 Epic Games 免费游戏自动领取</h1>
-            <p class="subtitle">基于 Docker · Playwright · 每周自动执行</p>
+            <p class="subtitle">设备码授权 · 零浏览器 · 零验证码</p>
         </header>
 
-        <!-- 凭证状态横幅 -->
+        <!-- 状态横幅 -->
         <div id="status-banner" class="banner info" hidden></div>
 
-        <!-- ===== 模式 1：手动立即领取 ===== -->
-        <section class="card">
-            <h2>📋 立即领取（一次性）</h2>
-            <p class="tip">
-                ⚠️ 此模式下账号密码<strong>仅在本次请求中使用</strong>，不会保存。
-                适合临时用一下。
-            </p>
-
-            <form id="claim-form">
-                <div class="form-group">
-                    <label for="username">Epic 账号（邮箱）</label>
-                    <input type="text" id="username" name="username"
-                           autocomplete="username" placeholder="your-email@example.com" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="password">Epic 密码</label>
-                    <div class="password-wrap">
-                        <input type="password" id="password" name="password"
-                               autocomplete="current-password" placeholder="请输入密码" required>
-                        <button type="button" id="toggle-pwd" class="toggle-pwd" title="显示/隐藏密码">👁</button>
-                    </div>
-                </div>
-
-                <button type="submit" id="submit-btn" class="btn-primary">
-                    <span class="btn-text">🚀 开始领取</span>
-                    <span class="btn-spinner" hidden>领取中…</span>
-                </button>
-            </form>
-
-            <div id="result" class="result" hidden></div>
-        </section>
-
-        <!-- ===== 模式 1.5：Epic 设备码登录（推荐） ===== -->
+        <!-- ===== 单一认证区：设备码登录（推荐） ===== -->
         <section class="card highlight-top">
             <h2>🎯 Epic 设备码登录 <span class="badge-recommended">推荐</span></h2>
             <p class="tip">
@@ -73,17 +40,6 @@
                 </button>
                 <button type="button" id="delete-device-auth-btn" class="btn-danger" hidden>🗑 撤销授权</button>
             </div>
-
-            <!-- 调试区域 -->
-            <details style="margin-top:16px;">
-                <summary style="cursor:pointer; color:#94a3b8; font-size:13px;">🛠 调试选项（检查 API 是否工作）</summary>
-                <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
-                    <button type="button" id="test-free-games-btn" class="btn-secondary">测试免费游戏 API</button>
-                    <button type="button" id="test-device-code-btn" class="btn-secondary">测试申请 device code</button>
-                    <button type="button" id="test-claim-btn" class="btn-secondary">测试领取流程</button>
-                </div>
-                <pre id="device-auth-debug-output" style="margin-top:12px; padding:12px; background:rgba(0,0,0,0.3); border-radius:6px; font-size:12px; max-height:300px; overflow:auto; white-space:pre-wrap; word-break:break-all;"></pre>
-            </details>
 
             <!-- 设备码授权进行中 -->
             <div id="device-auth-flow" hidden>
@@ -109,82 +65,99 @@
                 <button type="button" id="cancel-device-auth-btn" class="btn-secondary">取消授权</button>
             </div>
 
+            <!-- 立即领取（设备码已授权时显示） -->
+            <div id="manual-claim-section" hidden>
+                <h3 style="margin-top:20px;">🎯 立即领取</h3>
+                <p class="hint">基于已保存的 device auth token，立即调用 Epic API 领取本周免费游戏（无需浏览器）。</p>
+                <button type="button" id="claim-now-btn" class="btn-primary" style="margin-top:10px;">
+                    <span class="btn-text">🚀 立即领取</span>
+                    <span class="btn-spinner" hidden>领取中…</span>
+                </button>
+                <div id="manual-claim-result" class="result" hidden></div>
+            </div>
+
+            <!-- 自动领取开关（设备码已授权时显示） -->
+            <div id="auto-claim-section" hidden>
+                <h3 style="margin-top:20px;">⏰ 每周自动领取</h3>
+                <p>每周 <strong>{{ schedule_info.day }}</strong>（北京时间）
+                    <strong>{{ "%02d"|format(schedule_info.hour) }}:{{ "%02d"|format(schedule_info.minute) }}</strong>
+                    自动检查（<code>{{ schedule_info.timezone }}</code>）
+                </p>
+                <div class="switch-row">
+                    <span>自动领取开关：</span>
+                    <label class="switch">
+                        <input type="checkbox" id="auto-switch">
+                        <span class="slider"></span>
+                    </label>
+                    <span id="auto-status-text" class="auto-status"></span>
+                </div>
+            </div>
+
             <div id="device-auth-result" class="result" hidden></div>
+
+            <!-- 调试区域 -->
+            <details style="margin-top:16px;">
+                <summary style="cursor:pointer; color:#94a3b8; font-size:13px;">🛠 调试选项（检查 API 是否工作）</summary>
+                <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+                    <button type="button" id="test-free-games-btn" class="btn-secondary">测试免费游戏 API</button>
+                    <button type="button" id="test-free-games-raw-btn" class="btn-secondary">查看原始数据</button>
+                    <button type="button" id="test-device-code-btn" class="btn-secondary">测试申请 device code</button>
+                    <button type="button" id="test-claim-btn" class="btn-secondary">测试领取流程</button>
+                </div>
+                <pre id="device-auth-debug-output" style="margin-top:12px; padding:12px; background:rgba(0,0,0,0.3); border-radius:6px; font-size:12px; max-height:300px; overflow:auto; white-space:pre-wrap; word-break:break-all;"></pre>
+            </details>
         </section>
 
-        <!-- ===== 模式 2：保存凭证 + 自动领取 ===== -->
-        <section class="card highlight">
-            <h2>🔁 保存凭证 · 每周自动领取</h2>
-            <p class="tip">
-                🔒 账号密码会用 <strong>AES 加密</strong>后存入容器内的
-                <code>/app/data/credentials.enc</code>。每周定时自动解密使用 → 用完立即从内存清除。
-            </p>
-            <p class="hint">
-                ⚠️ 与"零留存"模式不同：此模式需要持久化凭证。
-                <strong>密钥 (EPIC_MASTER_KEY) 一旦泄露，已保存的凭证即泄露</strong>。
-                请妥善保管 .env 文件，不要提交到 git。
-            </p>
+        <!-- ===== 备选：账号密码登录（高级用户） ===== -->
+        <details class="card">
+            <summary style="cursor:pointer; color:#cbd5e1; font-weight:600; font-size:16px;">
+                ⚙️ 备选方案：账号密码登录（高级用户）
+            </summary>
 
-            <div id="cred-status" class="cred-status">
-                <span class="status-dot"></span>
-                <span id="cred-status-text">加载中…</span>
-            </div>
+            <div style="margin-top:16px;">
+                <p class="hint">
+                    适用于无法使用设备码的环境。账号密码会被加密保存到容器内，
+                    每周自动领取时解密使用。Playwright 自动登录会触发 hCaptcha（会自动重试）。
+                </p>
+                <p class="hint">
+                    ⚠️ <strong>与设备码方案互斥：</strong>同时启用时优先使用设备码。
+                </p>
 
-            <form id="save-form">
-                <div class="form-group">
-                    <label for="save-username">Epic 账号（邮箱）</label>
-                    <input type="text" id="save-username" name="username"
-                           autocomplete="username" placeholder="your-email@example.com">
+                <div id="cred-status" class="cred-status">
+                    <span class="status-dot"></span>
+                    <span id="cred-status-text">加载中…</span>
                 </div>
 
-                <div class="form-group">
-                    <label for="save-password">Epic 密码</label>
-                    <div class="password-wrap">
-                        <input type="password" id="save-password" name="password"
-                               autocomplete="new-password" placeholder="请输入密码">
-                        <button type="button" id="toggle-save-pwd" class="toggle-pwd" title="显示/隐藏密码">👁</button>
+                <form id="save-form">
+                    <div class="form-group">
+                        <label for="save-username">Epic 账号（邮箱）</label>
+                        <input type="text" id="save-username" name="username"
+                               autocomplete="username" placeholder="your-email@example.com">
                     </div>
-                </div>
 
-                <div class="form-check">
-                    <input type="checkbox" id="enable-auto" checked>
-                    <label for="enable-auto">保存后启用每周自动领取</label>
-                </div>
+                    <div class="form-group">
+                        <label for="save-password">Epic 密码</label>
+                        <div class="password-wrap">
+                            <input type="password" id="save-password" name="password"
+                                   autocomplete="new-password" placeholder="请输入密码">
+                            <button type="button" id="toggle-save-pwd" class="toggle-pwd" title="显示/隐藏密码">👁</button>
+                        </div>
+                    </div>
 
-                <div class="btn-row">
-                    <button type="submit" id="save-btn" class="btn-primary">
-                        <span class="btn-text">💾 保存凭证（加密）</span>
-                        <span class="btn-spinner" hidden>保存中…</span>
-                    </button>
-                    <button type="button" id="delete-btn" class="btn-danger" hidden>🗑 删除凭证</button>
-                </div>
-            </form>
+                    <div class="btn-row">
+                        <button type="submit" id="save-btn" class="btn-primary">
+                            <span class="btn-text">💾 保存凭证（加密）</span>
+                            <span class="btn-spinner" hidden>保存中…</span>
+                        </button>
+                        <button type="button" id="delete-btn" class="btn-danger" hidden>🗑 删除凭证</button>
+                        <button type="button" id="quick-claim-btn" class="btn-secondary">🚀 立即领取（用此账号）</button>
+                    </div>
+                </form>
 
-            <div id="save-result" class="result" hidden></div>
-        </section>
-
-        <!-- ===== 自动领取开关（独立） ===== -->
-        <section class="card">
-            <h2>⏰ 自动调度</h2>
-            <p>每周 <strong>{{ schedule_info.day }}</strong>（北京时间）
-                <strong>{{ "%02d"|format(schedule_info.hour) }}:{{ "%02d"|format(schedule_info.minute) }}</strong>
-                自动检查（<code>{{ schedule_info.timezone }}</code>）
-            </p>
-
-            <div class="switch-row">
-                <span>自动领取开关：</span>
-                <label class="switch">
-                    <input type="checkbox" id="auto-switch">
-                    <span class="slider"></span>
-                </label>
-                <span id="auto-status-text" class="auto-status"></span>
+                <div id="save-result" class="result" hidden></div>
+                <div id="quick-claim-result" class="result" hidden></div>
             </div>
-
-            <p class="hint">
-                ℹ️ 需要先在上方"保存凭证"区块保存账号密码，自动领取才会真正执行。
-                没有凭证时开启开关也会被拒绝。
-            </p>
-        </section>
+        </details>
 
         <!-- ===== 历史 ===== -->
         <section class="card">
@@ -196,13 +169,12 @@
         </section>
 
         <footer>
-            <p>🔒 隐私承诺：未启用"保存凭证"时，账号密码仅在请求内存中存在</p>
-            <p>⚙️ 启用"保存凭证"后，账号密码以 AES-128-CBC 加密后持久化</p>
+            <p>🔒 设备码授权：token 永不过期（除非你撤销）</p>
+            <p>⚙️ 账号密码模式：凭证以 AES-128-CBC 加密后持久化</p>
         </footer>
     </div>
 
     <script src="/static/app.js"></script>
-    <script src="/static/claim.js"></script>
     <script src="/static/device_auth.js"></script>
 </body>
 </html>
