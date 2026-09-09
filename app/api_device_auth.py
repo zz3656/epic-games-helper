@@ -196,23 +196,23 @@ async def test_fetch_free_games_raw():
             )
             data = resp.json()
             elements = data.get("data", {}).get("Catalog", {}).get("searchStore", {}).get("elements", [])
-            # 提取每个游戏的 promotions 信息
+            # 只看前 5 个游戏的详细 promotions 结构
             summary = []
-            for item in elements[:20]:  # 只看前 20 个
+            for item in elements[:5]:
                 title = item.get("title", "")
-                promos = item.get("promotions", {})
-                prom_offers = promos.get("promotionalOffers", [])
-                upcoming = promos.get("upcomingPromotionalOffers", [])
+                item_id = item.get("id", "")
+                slug = item.get("productSlug") or item.get("urlSlug") or item.get("offerId", "")
+                promos = item.get("promotions") or {}
                 summary.append({
                     "title": title,
-                    "promotional_offers_count": len(prom_offers),
-                    "upcoming_offers_count": len(upcoming),
-                    "promotional_offers_sample": prom_offers[:1] if prom_offers else [],
-                    "price_total": item.get("price", {}).get("totalPrice", {}).get("fmtPrice", {}),
+                    "id": item_id,
+                    "slug": slug,
+                    "promotions": promos,  # 完整结构
                 })
             return JSONResponse(content={
                 "success": True,
                 "total_elements": len(elements),
+                "elements_with_promotions": sum(1 for e in elements if e.get("promotions")),
                 "summary": summary,
             })
     except Exception as e:

@@ -307,7 +307,13 @@ class EpicAPIClient:
     # ============================================
 
     async def fetch_free_games(self) -> List[FreeGame]:
-        """从 Epic 公开 API 获取本周免费游戏（无需登录）"""
+        """从 Epic 公开 API 获取本周免费游戏（无需登录）
+
+        筛选策略：
+        - 检查 promotionalOffers 中是否所有包含的游戏都打折到 0%（100% 免费）
+        - 跳过只有 upcomingPromotionalOffers 的游戏（这些是下周才免费）
+        - 跳过有 totalPrice > 0 的游戏（不是完全免费）
+        """
         try:
             resp = await self.client.get(
                 EPIC_FREE_GAMES,
@@ -318,33 +324,40 @@ class EpicAPIClient:
             games = []
 
             for item in data.get("data", {}).get("Catalog", {}).get("searchStore", {}).get("elements", []):
-                # 只取当前可领取的（排除 upcoming/已结束）
-                promotions = item.get("promotions", {})
-                offers = promotions.get("promotionalOffers", [])
-                upcoming = promotions.get("upcomingPromotionalOffers", [])
-
-                # 必须有 promotionalOffers 才算当前免费
+                # 快速过滤: 必须有 promotionalOffers
+                promotions = item.get("promotions") or {}
+                offers = promotions.get("promotionalOffers") or []
                 if not offers:
                     continue
 
-                # 排除黑名单/已拥有
-                title = item.get("title", "")
-                offer_id = None
-                for promo in offers:
-                    for offer in promo.get("promotionalOffers", []):
-                        if offer.get("discountSetting", {}).get("discountType") == "PERCENTAGE":
-                            if offer.get("discountPercentage") == 0:
-                                # 100% off = 免费
-                                offer_id = item.get("id")
-                                break
-                    if offer_id:
+                # 检查 promotionalOffers 内的所有 offer 都打折到 0%
+                has_full_free = False
+                for promo_group in offers:
+                    for offer in promo_group.get("promotionalOffers", []):
+                        ds = offer.get("discountSetting") or {}
+                        if ds.get("discountType") == "PERCENTAGE" and ds.get("discountPercentage") == 0:
+                            has_full_free = True
+                            break
+                    if has_full_free:
                         break
 
-                if not offer_id:
+                if not has_full_free:
                     continue
 
-                # 构造游戏页 URL
-                slug = item.get("productSlug") or item.get("urlSlug") or item.get("offerId")
+                # 双检: 实际价格必须为 0
+                price = item.get("price", {}).get("totalPrice", {})
+                if price.get("discountPrice", 0) != 0:
+                    # 如果 有 promo 但不是 0，跳过
+                    continue
+
+                # 双检: namespace.id 格式的 offer_id
+                offer_id = item.get("id", "")
+                if not offer_id or "/" not in offer_id:
+                    # 有时 offerId 不在 id 字段
+                    offer_id = item.get("offerId") or offer_id
+
+                title = item.get("title", "Unknown")
+                slug = item.get("productSlug") or item.get("urlSlug") or offer_id.split("/")[-1]
                 url = f"https://store.epicgames.com/zh-CN/p/{slug}" if slug else ""
 
                 games.append(FreeGame(
