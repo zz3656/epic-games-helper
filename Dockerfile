@@ -17,7 +17,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-noto-cjk \
     fonts-wqy-microhei \
     fonts-wqy-zenhei \
-    \
     libasound2 \
     libatk-bridge2.0-0 \
     libatk1.0-0 \
@@ -56,8 +55,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     websockify \
     x11-utils \
     xterm \
-    fluxbox \  # 轻量级窗口管理器，让 Chrome 窗口可见
-    \
+    fluxbox \
     && rm -rf /var/lib/apt/lists/*
 
 # 创建工作目录
