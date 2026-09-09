@@ -39,6 +39,15 @@ EPIC_FREE_GAMES = "https://store-site-backend-static.ak.epicgames.com/freeGamesP
 EPIC_PURCHASE_ORDER = "https://www.epicgames.com/store/purchase"
 EPIC_CHECKOUT_ORDER = "https://payment-website-pci.ol.epicgames.com/purchase/confirm-order"
 
+# User entitlements (查询用户已拥有的游戏)
+EPIC_ENTITLEMENTS_HOST = "entitlement-public-service-prod08.ol.epicgames.com"
+EPIC_CATALOG_HOST = "catalog-public-service-prod06.ol.epicgames.com"
+EPIC_ENTITLEMENTS_URL = f"https://{EPIC_ENTITLEMENTS_HOST}/entitlement/api/account/{{account_id}}/entitlements"
+EPIC_CATALOG_BULK_URL = f"https://{EPIC_CATALOG_HOST}/catalog/api/shared/namespace/{{namespace}}/bulk/items"
+
+# 游戏封面图片
+EPIC_IMAGE_BASE = "https://cdn1.epicgames.com/offer"
+
 # OAuth client credentials
 # 参考 MixV2/EpicResearch 官方文档推荐的 fortnitePCGameClient
 # 以及 claabs/epicgames-freegames-node 使用的 fortniteNewSwitchGameClient
@@ -97,6 +106,14 @@ class FreeGame:
     offer_id: str
     status: str = "pending"
     message: str = ""
+    image_url: str = ""          # 游戏封面 URL
+    description: str = ""        # 游戏描述
+    namespace: str = ""          # Epic namespace
+    already_owned: bool = False  # 用户是否已拥有该游戏
+    checkout_url: str = ""       # 领取链接 (如未领取)
+    start_date: str = ""         # 免费开始日期
+    end_date: str = ""           # 免费结束日期
+    original_price: str = ""     # 原价
 
 
 class EpicAPIClient:
@@ -333,11 +350,15 @@ class EpicAPIClient:
 
                 # 检查 promotionalOffers 内的所有 offer 都打折到 0%
                 has_full_free = False
+                start_date = ""
+                end_date = ""
                 for promo_group in offers:
                     for offer in promo_group.get("promotionalOffers", []):
                         ds = offer.get("discountSetting") or {}
                         if ds.get("discountType") == "PERCENTAGE" and ds.get("discountPercentage") == 0:
                             has_full_free = True
+                            start_date = offer.get("startDate", "")
+                            end_date = offer.get("endDate", "")
                             break
                     if has_full_free:
                         break
@@ -357,14 +378,41 @@ class EpicAPIClient:
                     # 有时 offerId 不在 id 字段
                     offer_id = item.get("offerId") or offer_id
 
+                namespace = offer_id.split("/")[0] if "/" in offer_id else ""
+
                 title = item.get("title", "Unknown")
                 slug = item.get("productSlug") or item.get("urlSlug") or offer_id.split("/")[-1]
                 url = f"https://store.epicgames.com/zh-CN/p/{slug}" if slug else ""
+
+                # 获取封面图
+                image_url = ""
+                key_images = item.get("keyImages") or []
+                for img in key_images:
+                    if img.get("type") in ("Thumbnail", "DieselStoreFrontWide", "OfferImageWide", "VaultClosed"):
+                        image_url = img.get("url", "")
+                        if img.get("type") == "Thumbnail":
+                            break
+                if not image_url and key_images:
+                    image_url = key_images[0].get("url", "")
+
+                # 获取描述
+                description = item.get("description", "") or item.get("shortDescription", "")
+
+                # 获取原价
+                original_price = ""
+                fmt_price = price.get("fmtPrice", {})
+                original_price = fmt_price.get("originalPrice", "")
 
                 games.append(FreeGame(
                     title=title,
                     url=url,
                     offer_id=offer_id,
+                    image_url=image_url,
+                    description=description,
+                    namespace=namespace,
+                    start_date=start_date,
+                    end_date=end_date,
+                    original_price=original_price,
                 ))
 
             logger.info("获取到 %d 款免费游戏", len(games))
@@ -398,6 +446,117 @@ class EpicAPIClient:
             logger.warning("获取 XSRF token 失败: %s", e)
 
         return None
+
+    # ============================================
+    # Entitlements 查询（用户已拥有的游戏）
+    # ============================================
+
+    async def fetch_user_entitlements(
+        self, credentials: DeviceAuthCredentials,
+    ) -> set:
+        """查询用户已拥有的 entitlement names
+
+        参考 legendary 的 get_user_entitlements 接口：
+        GET https://entitlement-public-service-prod08.ol.epicgames.com/entitlement/api/account/{accountId}/entitlements?start=0&count=1000
+
+        Returns:
+            set of entitlement names (e.g. {"FNBR_Athena_MTX", ...})
+            这些是 catalogItemId，需要与游戏信息匹配判断是否已拥有。
+        """
+        # 刷新 token（如果过期）
+        if credentials.is_expired():
+            try:
+                credentials = await self.refresh_access_token(credentials)
+            except Exception:
+                pass
+
+        account_id = credentials.account_id
+        all_entitlement_names = set()
+        start = 0
+        page_size = 1000
+
+        try:
+            while True:
+                url = EPIC_ENTITLEMENTS_URL.format(account_id=account_id)
+                resp = await self.client.get(
+                    url,
+                    params={"start": start, "count": page_size},
+                    headers={
+                        "Authorization": f"Bearer {credentials.access_token}",
+                    },
+                )
+                if resp.status_code != 200:
+                    logger.warning("entitlements 查询失败: %s - %s", resp.status_code, resp.text[:200])
+                    break
+
+                data = resp.json()
+                if not data:
+                    break
+
+                # data 是 entitlements 列表
+                for ent in data:
+                    name = ent.get("entitlementName") or ent.get("catalogItemId")
+                    if name:
+                        all_entitlement_names.add(name)
+
+                if len(data) < page_size:
+                    break
+                start += page_size
+
+            logger.info("查询到 %d 个用户 entitlement", len(all_entitlement_names))
+            return all_entitlement_names
+        except Exception as e:
+            logger.exception("查询 entitlements 异常")
+            return set()
+
+    def _build_checkout_url(self, game: FreeGame) -> str:
+        """构造领取链接（与 claabs/epicgames-freegames-node 一致）"""
+        namespace = game.namespace or (game.offer_id.split("/")[0] if "/" in game.offer_id else "")
+        offers_param = f"&offers=1-{namespace}-{game.offer_id}"
+        checkout_url = f"https://www.epicgames.com/store/purchase?highlightColor=0078f2{offers_param}&orderId&purchaseToken&showNavigation=true"
+        login_redirect_url = (
+            f"https://www.epicgames.com/id/login?"
+            f"noHostRedirect=true&redirectUrl={checkout_url}&client_id=875a3b57d3a640a6b7f9b4e883463ab4"
+        )
+        return login_redirect_url
+
+    async def fetch_free_games_with_status(
+        self, credentials: Optional[DeviceAuthCredentials] = None,
+    ) -> List[FreeGame]:
+        """获取本周免费游戏 + 检查用户是否已拥有 + 生成领取链接
+
+        Args:
+            credentials: device auth credentials（如未提供则不检查是否已拥有）
+
+        Returns:
+            List[FreeGame] with already_owned, checkout_url filled
+        """
+        # 1. 获取本周免费游戏
+        games = await self.fetch_free_games()
+        if not games:
+            return []
+
+        # 2. 查询用户已拥有的 entitlements
+        user_entitlements = set()
+        if credentials:
+            try:
+                user_entitlements = await self.fetch_user_entitlements(credentials)
+            except Exception as e:
+                logger.warning("查询 entitlements 失败，继续返回未标记状态: %s", e)
+
+        # 3. 标记每款游戏
+        for game in games:
+            # 检查是否已拥有（通过 offer_id 的 catalogItemId 部分匹配）
+            offer_id_short = game.offer_id.split("/")[-1] if "/" in game.offer_id else game.offer_id
+            if offer_id_short in user_entitlements or game.offer_id in user_entitlements:
+                game.already_owned = True
+                game.status = "already_claimed"
+                game.message = "已拥有"
+
+            # 生成领取链接
+            game.checkout_url = self._build_checkout_url(game)
+
+        return games
 
     # ============================================
     # 领取游戏

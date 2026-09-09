@@ -415,3 +415,48 @@ async def test_claim_with_device_auth():
             "success": False,
             "error": str(e),
         }, status_code=500)
+
+
+@router.get("/api/free-games")
+async def get_free_games():
+    """获取本周免费游戏列表，包含封面图、描述、是否已拥有、领取链接等信息
+
+    如已授权 device auth，会检查 entitlement 标记是否已拥有。
+    """
+    from app.epic_api import EpicAPIClient
+
+    credentials = None
+    if _credential_store and _credential_store.has_device_auth():
+        try:
+            credentials = _credential_store.load_device_auth()
+        except Exception:
+            pass
+
+    try:
+        async with EpicAPIClient() as client:
+            games = await client.fetch_free_games_with_status(credentials)
+            return JSONResponse(content={
+                "success": True,
+                "games": [
+                    {
+                        "title": g.title,
+                        "url": g.url,
+                        "offer_id": g.offer_id,
+                        "namespace": g.namespace,
+                        "image_url": g.image_url,
+                        "description": g.description,
+                        "already_owned": g.already_owned,
+                        "checkout_url": g.checkout_url,
+                        "start_date": g.start_date,
+                        "end_date": g.end_date,
+                        "original_price": g.original_price,
+                    }
+                    for g in games
+                ],
+            })
+    except Exception as e:
+        logger.exception("获取免费游戏列表失败")
+        return JSONResponse(content={
+            "success": False,
+            "error": str(e),
+        }, status_code=500)

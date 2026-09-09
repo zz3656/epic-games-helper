@@ -27,6 +27,10 @@ const autoStatusText = document.getElementById("auto-status-text");
 // 进度轮询定时器
 let claimProgressTimer = null;
 
+// 免费游戏卡片
+const freeGamesGrid = document.getElementById("free-games-grid");
+const freeGamesHint = document.getElementById("free-games-hint");
+
 // ============ 启动设备码授权 ============
 startDeviceAuthBtn.addEventListener("click", async () => {
     startDeviceAuthBtn.disabled = true;
@@ -331,6 +335,97 @@ async function loadHistory() {
 
 document.getElementById("refresh-history").addEventListener("click", loadHistory);
 
+// ============ 本周免费游戏卡片 ============
+function formatDate(iso) {
+    if (!iso) return "";
+    try {
+        const d = new Date(iso);
+        return `${d.getMonth() + 1}/${d.getDate()}`;
+    } catch { return ""; }
+}
+
+function formatDates(startIso, endIso) {
+    const s = formatDate(startIso);
+    const e = formatDate(endIso);
+    if (!s && !e) return "";
+    return `${s} – ${e}`;
+}
+
+function daysUntilEnd(endIso) {
+    if (!endIso) return null;
+    try {
+        const end = new Date(endIso);
+        const now = new Date();
+        const diff = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+        return diff;
+    } catch { return null; }
+}
+
+async function loadFreeGames() {
+    if (!freeGamesGrid) return;
+    try {
+        const resp = await fetch("/api/free-games");
+        const data = await resp.json();
+        if (!data.success) {
+            freeGamesGrid.innerHTML = `<div class="empty-state">加载失败：${escapeHtml(data.error || "")}</div>`;
+            freeGamesHint.textContent = "本周免费游戏加载失败";
+            return;
+        }
+
+        const games = data.games || [];
+        if (games.length === 0) {
+            freeGamesGrid.innerHTML = `<div class="empty-state">📭 本周暂无免费游戏</div>`;
+            freeGamesHint.textContent = "本周暂无免费游戏";
+            return;
+        }
+
+        freeGamesHint.textContent = `本周共 ${games.length} 款免费游戏可领取`;
+
+        freeGamesGrid.innerHTML = games.map(g => {
+            const owned = g.already_owned;
+            const daysLeft = daysUntilEnd(g.end_date);
+            const datesHtml = g.start_date || g.end_date
+                ? `<div class="game-dates">
+                       🆓 <span class="free">${escapeHtml(formatDates(g.start_date, g.end_date))}</span>
+                       ${daysLeft !== null && daysLeft > 0 && daysLeft <= 3
+                           ? ` <span class="end-soon">仅剩 ${daysLeft} 天</span>` : ""}
+                   </div>`
+                : "";
+            const priceHtml = g.original_price
+                ? `<div class="game-price"><span class="original">${escapeHtml(g.original_price)}</span> <span class="free">免费</span></div>`
+                : `<div class="game-price"><span class="free">🆓 免费领取</span></div>`;
+
+            const cover = g.image_url
+                ? `<img class="game-cover" src="${escapeHtml(g.image_url)}" alt="${escapeHtml(g.title)}" loading="lazy" onerror="this.outerHTML='<div class=&quot;game-cover-placeholder&quot;>🎮</div>'">`
+                : `<div class="game-cover-placeholder">🎮</div>`;
+
+            const badge = owned
+                ? `<span class="game-status-badge owned">已拥有</span>`
+                : `<span class="game-status-badge free">可领取</span>`;
+
+            const actionBtn = owned
+                ? `<button class="btn-claim-card owned" disabled>✅ 已拥有</button>`
+                : `<a class="btn-claim-card" href="${escapeHtml(g.checkout_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">领取</a>`;
+
+            return `
+                <div class="game-card ${owned ? "owned" : ""}" data-offer-id="${escapeHtml(g.offer_id)}">
+                    ${cover}
+                    <div class="game-info">
+                        <h3 class="game-title">${escapeHtml(g.title)} ${badge}</h3>
+                        ${datesHtml}
+                        ${priceHtml}
+                        ${g.description ? `<div class="game-description">${escapeHtml(g.description)}</div>` : ""}
+                        <div class="game-actions">${actionBtn}</div>
+                    </div>
+                </div>
+            `;
+        }).join("");
+    } catch (err) {
+        console.error("加载免费游戏失败:", err);
+        if (freeGamesHint) freeGamesHint.textContent = "加载失败";
+    }
+}
+
 // ============ 调试按钮 ============
 const debugOutput = document.getElementById("device-auth-debug-output");
 
@@ -385,3 +480,5 @@ document.getElementById("test-claim-btn").addEventListener("click", async () => 
 
 // 页面加载时初始化
 refreshDeviceAuthStatus();
+loadFreeGames();
+loadHistory();
