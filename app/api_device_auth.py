@@ -460,32 +460,40 @@ async def device_auth_account_info():
 
     # 尝试使用 credentials 访问 library API 检查是否可用
     from app.epic_api import EpicAPIClient
-    try:
-        async with EpicAPIClient() as client:
-            # 先尝试用现有 token
-            check_creds = credentials
-            if check_creds.is_expired():
-                try:
-                    check_creds = await client.refresh_access_token(check_creds)
-                    result["access_token_valid"] = True
-                except Exception as e:
-                    result["error"] = f"token 刷新失败：{e}"
-                    return JSONResponse(content=result)
+    import asyncio
 
-            # 尝试调 library API（只取 1 条验证可访问）
-            resp = await client.client.get(
-                "https://library-service.live.use1a.on.epicgames.com/library/api/public/items",
-                params={"includeMetadata": "true", "count": 1},
-                headers={"Authorization": f"Bearer {check_creds.access_token}"},
-            )
-            if resp.status_code == 200:
-                result["library_api_accessible"] = True
-            elif resp.status_code == 401:
-                result["error"] = "Token 无效，需重新授权"
-            elif resp.status_code == 403:
-                result["error"] = "Token 无权访问 library API，需重新授权"
-            else:
-                result["error"] = f"library API 返回 HTTP {resp.status_code}"
+    try:
+        # 给整个检查流程加上 5 秒超时，避免卡死前端请求
+        async def _check_library():
+            async with EpicAPIClient() as client:
+                check_creds = credentials
+                if check_creds.is_expired():
+                    try:
+                        check_creds = await client.refresh_access_token(check_creds)
+                        result["access_token_valid"] = True
+                    except Exception as e:
+                        result["error"] = f"token 刷新失败：{e}"
+                        return
+
+                resp = await client.client.get(
+                    "https://library-service.live.use1a.on.epicgames.com/library/api/public/items",
+                    params={"includeMetadata": "true", "count": 1},
+                    headers={"Authorization": f"Bearer {check_creds.access_token}"},
+                    timeout=5.0,
+                )
+                if resp.status_code == 200:
+                    result["library_api_accessible"] = True
+                elif resp.status_code == 401:
+                    result["error"] = "Token 无效，需重新授权"
+                elif resp.status_code == 403:
+                    result["error"] = "Token 无权访问 library API，需重新授权"
+                else:
+                    result["error"] = f"library API 返回 HTTP {resp.status_code}"
+
+        try:
+            await asyncio.wait_for(_check_library(), timeout=8.0)
+        except asyncio.TimeoutError:
+            result["error"] = "library API 超时（网络问题或 token 过期）"
     except Exception as e:
         logger.exception("检查账号可用性异常")
         result["error"] = f"检查异常：{type(e).__name__}: {e}"

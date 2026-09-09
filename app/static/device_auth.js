@@ -453,7 +453,11 @@ async function loadAccountGames() {
     } catch (err) {
         console.error("加载账号游戏库失败:", err);
         accountGamesHint.textContent = "加载失败";
-        accountGamesGrid.innerHTML = `<div class="empty-state">加载失败：${escapeHtml(String(err))}</div>`;
+        accountGamesGrid.innerHTML = `<div class="empty-state">
+            ❌ 加载失败<br>
+            <span style="font-size:12px; color:#fbbf24;">${escapeHtml(String(err.message || err))}</span><br>
+            <span style="font-size:11px; color:#94a3b8;">请查看浏览器 Console 获取详细信息</span>
+        </div>`;
     }
 }
 
