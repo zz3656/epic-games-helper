@@ -1,20 +1,33 @@
 # 🎮 Epic Games Free Games Auto-Claimer
 
-> Auto-claim Epic Games weekly free games with **Docker + Playwright**, featuring a clean web UI and zero credential retention design.
+> Auto-claim Epic Games weekly free games — **zero browser, zero captcha**, with persistent device auth.
 
 🇨🇳 [中文版 README](README-zh-CN.md)
 
-## ✨ Features
+## ✨ Two Ways to Authenticate
 
-| Feature | Description |
-|---------|-------------|
-| 🌐 **Web UI** | Open in browser — no CLI needed |
-| 🔓 **One-time Claim** | Enter credentials manually each time; cleared after use |
-| 🔁 **Auto-Claim** | Enter once, runs weekly automatically; Fernet (AES-128-CBC) encrypted storage |
-| 🐳 **Zero-config Start** | `EPIC_MASTER_KEY` auto-generated on first run |
-| ⏰ **Scheduler** | Configurable weekly schedule (default: Thursday 17:00 Beijing time) |
-| 📊 **History** | Track past claim results (sanitized) |
-| 🛡️ **Secure by Design** | No-new-privileges container, resource limits, `0600` on encrypted files |
+This project supports **two authentication modes** — pick whichever fits your needs:
+
+### 🎯 Recommended: **Device Auth (Zero-Captcha)**
+
+> Inspired by [claabs/epicgames-freegames-node](https://github.com/claabs/epicgames-freegames-node) — uses Epic's official OAuth device code flow.
+
+| Feature | Benefit |
+|---------|---------|
+| ⚡ **One-time authorization** | User logs in once in their browser → tool gets a permanent device auth token |
+| 🚫 **No hCaptcha** | Login happens on Epic's official OAuth page, no automation fingerprints |
+| 📦 **No Playwright/Chromium** | Pure HTTP API calls → container drops from ~1GB to ~150MB |
+| 🛡️ **No server IP risk** | Browser login is from your IP, not the server |
+| ♾️ **Never expires** | Token only revokes when you manually log out |
+
+### 🔐 Alternative: **Username/Password (Browser Automation)**
+
+For users who can't use Device Auth or want quick testing. Uses Playwright with stealth anti-detection — but will encounter hCaptcha occasionally.
+
+| Pros | Cons |
+|------|------|
+| Simple one-step login | May trigger hCaptcha (auto-resolved if possible) |
+| Works behind any network | Requires Playwright + Chromium (~1GB container) |
 
 ## 🚀 Quick Start
 
@@ -28,16 +41,25 @@ docker compose up -d
 
 Open in browser: **http://localhost:8000**
 
-### 2. Save Credentials (One-time Setup)
+### 2. Authenticate (Pick One)
 
-In the Web UI:
-1. Enter your Epic Games email and password
-2. Check "Enable weekly auto-claim"
-3. Click Save
+**Option A — Device Auth (Recommended):**
+1. Web UI → "🎯 Epic 设备码登录" section
+2. Click "🔑 Epic 设备码授权"
+3. Copy the `user_code`, click the link to Epic in your browser
+4. Log in to your Epic account and authorize the device
+5. Web UI will automatically save the token and start using it
 
-After that, the service automatically claims free games every week.
+**Option B — Username/Password:**
+1. Web UI → "🔁 保存凭证 · 每周自动领取" section
+2. Enter Epic email + password
+3. Click "💾 保存凭证（加密）"
 
-### 3. Docker Compose
+### 3. Wait for Auto-Claim
+
+Default schedule: **Thursday 17:00 Beijing time** weekly. View history anytime.
+
+## 🐳 Docker Compose
 
 ```yaml
 services:
@@ -51,7 +73,6 @@ services:
       - TZ=Asia/Shanghai
       - SCHEDULE_DAY=thu
       - SCHEDULE_HOUR=17
-      - HEADLESS=true
       - AUTO_CLAIM_ENABLED=true
     volumes:
       - ./logs:/app/logs
@@ -61,25 +82,17 @@ services:
       - no-new-privileges:true
 ```
 
+> 📌 **Multi-arch image**: supports `linux/amd64` and `linux/arm64` (Synology, QNAP, etc.)
+
 ## 🔐 Privacy & Security
 
-- **Fernet encryption** (AES-128-CBC + HMAC-SHA256) for stored credentials
-- **0600 file permissions** — only container root can read
-- **Zero credential retention** — passwords exist only in memory during claim, then garbage collected
-- **Never logged** — credentials are never written to logs
+| Storage | Encryption | File |
+|---------|------------|------|
+| Device Auth Token | Fernet (AES-128-CBC) | `/app/data/device_auth.enc` (0600) |
+| Username/Password | Fernet (AES-128-CBC) | `/app/data/credentials.enc` (0600) |
+| Master Key | Plain | `/app/data/.env` (0600) |
 
-## ⚙️ Configuration
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `EPIC_MASTER_KEY` | *auto-generated* | Fernet encryption key |
-| `TZ` | `Asia/Shanghai` | Timezone |
-| `SCHEDULE_DAY` | `thu` | Day to run (mon-sun) |
-| `SCHEDULE_HOUR` | `17` | Hour (0-23) |
-| `SCHEDULE_MINUTE` | `0` | Minute (0-59) |
-| `HEADLESS` | `true` | Headless browser mode |
-| `LOG_LEVEL` | `INFO` | Logging level |
-| `AUTO_CLAIM_ENABLED` | `false` | Enable auto-claim on startup |
+**Device Auth mode** stores only `{account_id, device_id, secret, access_token, refresh_token}` — **no password**, no credentials needed for re-claim.
 
 ## 🛠️ API
 
@@ -88,20 +101,33 @@ API docs at **http://localhost:8000/docs**.
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/health` | GET | Health check |
-| `/api/claim` | POST | Immediate claim |
-| `/api/claim/verification` | POST | Submit email verification code |
-| `/api/credentials` | POST/DELETE | Save/Delete credentials |
+| `/api/claim` | POST | Manual claim (username/password) |
+| `/api/device-auth/request` | POST | Start Device Auth flow |
+| `/api/device-auth/poll/{code}` | GET | Poll Device Auth status |
+| `/api/device-auth/status` | GET | Check Device Auth status |
+| `/api/device-auth/test/free-games` | POST | Debug: test free games API |
+| `/api/device-auth/test/request` | POST | Debug: test device code request |
+| `/api/device-auth/test/claim` | POST | Debug: test claim flow with token |
+| `/api/credentials` | POST/DELETE | Save/Delete username/password |
 | `/api/auto-claim/toggle` | POST | Toggle auto-claim |
 | `/api/history` | GET | Claim history |
 
 ## 🐛 Troubleshooting
 
-### hCaptcha Verification
+### Device Auth Fails
 
-If Epic presents an hCaptcha during login, the Web UI will show debug screenshots and clear instructions:
+Web UI → "🛠 调试选项" → "测试免费游戏 API" / "测试申请 device code" — the output shows the actual error from Epic's API. Common issues:
 
-1. **Wrong credentials** — Verify email and password
-2. **hCaptcha required** — Login to Epic in your personal browser once to "trust this device", then retry
+- **Client ID expired**: Epic rotates public client IDs. Update `EPIC_CLIENT_ID` in `app/epic_api.py`
+- **Network blocked**: Container can't reach Epic API. Check firewall/proxy
+- **Rate limited**: Too many requests. Wait 10 minutes
+
+### Browser Mode (Username/Password) hCaptcha
+
+If Epic presents hCaptcha:
+1. Auto-click will be attempted (3 retries, 8s wait each)
+2. If still not passed, container will wait 30 seconds for Epic's server to validate
+3. If still failing, the error message shows specific guidance
 
 ### Master Key Mismatch
 
@@ -109,7 +135,56 @@ If Epic presents an hCaptcha during login, the Web UI will show debug screenshot
 ERROR Decryption failed: master key mismatch
 ```
 
-Fix: Delete credentials via Web UI → Re-save.
+Fix: Web UI → "Delete Credentials" → Re-save.
+
+## 🏗️ Architecture
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  Web UI (Browser)                                        │
+│  • Device Auth section + Debug panel                     │
+│  • Username/Password section                             │
+│  • Auto-claim toggle + History                           │
+└──────────────────────────────────────────────────────────┘
+                           ↓
+┌──────────────────────────────────────────────────────────┐
+│  FastAPI Backend (port 8000)                             │
+│  • /api/device-auth/*    Device Auth flow                │
+│  • /api/claim             Manual claim                    │
+│  • /api/credentials       Save/load encrypted creds       │
+└──────────────────────────────────────────────────────────┘
+                           ↓
+┌──────────────────────────────────────────────────────────┐
+│  Scheduler (auto-selects)                                │
+│                                                          │
+│  Has Device Auth?                                        │
+│    YES → EpicAPIClient (pure HTTP, zero captcha)         │
+│    NO  → EpicClaimer (Playwright + stealth)              │
+└──────────────────────────────────────────────────────────┘
+```
+
+## 📚 Project Structure
+
+```
+epicgames/
+├── app/
+│   ├── main.py                # FastAPI entry
+│   ├── claimer.py             # Playwright claim core
+│   ├── claimer_login.py       # Login logic + hCaptcha
+│   ├── claimer_captcha.py     # hCaptcha auto-resolve
+│   ├── claimer_games.py       # Game fetch + claim (browser)
+│   ├── epic_api.py            # 🎯 Pure HTTP API client (device auth)
+│   ├── api_device_auth.py     # Device Auth endpoints
+│   ├── api_vnc.py             # VNC status (legacy, unused)
+│   ├── credential_store.py    # Fernet encryption
+│   ├── scheduler.py           # Auto-selects mode
+│   └── ...
+├── scripts/
+│   └── entrypoint.sh
+├── Dockerfile
+├── docker-compose.yml
+└── README.md
+```
 
 ## ⚠️ Disclaimer
 
@@ -117,14 +192,6 @@ Fix: Delete credentials via Web UI → Re-save.
 - Frequent automated actions may trigger account risk controls.
 - The author is not responsible for any account bans or damages.
 
-## 🏗️ Architecture
+## 📝 License
 
-```
-┌──────────────┐     ┌────────────────┐     ┌──────────────────┐
-│  User Browser │────▶│  FastAPI (:8000) │────▶│  Chromium         │
-│              │     │  • REST API    │     │  (Playwright)      │
-│              │     │  • Web UI      │     └──────────────────┘
-└──────────────┘     └────────────────┘
-```
-
-Single-port architecture — all access through port **8000**.
+MIT

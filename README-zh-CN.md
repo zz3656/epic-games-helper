@@ -1,20 +1,33 @@
 # 🎮 Epic Games 免费游戏自动领取
 
-> 基于 **Docker + Playwright** 的 Epic Games 周免游戏自动领取服务，带 Web 界面和零凭证留存设计。
+> 基于 **Docker + Epic OAuth Device Code** 的周免游戏自动领取服务。**零浏览器、零验证码**。
 
 🇺🇸 [English README](README.md)
 
-## ✨ 功能特性
+## ✨ 两种认证方式
 
-| 功能 | 说明 |
+本项目支持 **两种登录模式**，任选其一：
+
+### 🎯 推荐：**设备码授权（零验证码）**
+
+> 灵感来自 [claabs/epicgames-freegames-node](https://github.com/claabs/epicgames-freegames-node)——使用 Epic 官方的 OAuth device code 流程。
+
+| 特性 | 优势 |
 |------|------|
-| 🌐 **Web 可视化界面** | 浏览器打开即用，账号密码可视化输入 |
-| 🔓 **立即领取** | 每次手动输入账号密码，领取完即清，零留存 |
-| 🔁 **自动领取** | 输入一次，每周自动跑；Fernet (AES-128-CBC) 加密存储 |
-| 🐳 **零配置启动** | 首次启动自动生成密钥，无需手动创建 `.env` |
-| ⏰ **可调度** | 支持配置每周任意时间触发（默认周四 17:00 北京时间） |
-| 📊 **历史记录** | 查看过往领取结果（已脱敏） |
-| 🛡️ **安全加固** | 容器无特权模式、资源限制、加密文件 0600 权限 |
+| ⚡ **一次授权永久使用** | 用户在自己浏览器登录一次，工具获得永不过期的 token |
+| 🚫 **零 hCaptcha** | 登录走 Epic 官方 OAuth 页面，没有任何自动化特征 |
+| 📦 **零 Playwright/Chromium** | 纯 HTTP API 调用，容器从 ~1GB 降到 ~150MB |
+| 🛡️ **零 IP 风控** | 浏览器登录从你电脑的 IP 出发，不是服务器 IP |
+| ♾️ **永不过期** | 只有你手动撤销 Epic 设备授权才会失效 |
+
+### 🔐 备选：**账号密码（浏览器自动化）**
+
+适用于无法使用设备码或临时测试的用户。使用 Playwright + 反检测 stealth——但偶尔会遇到 hCaptcha。
+
+| 优点 | 缺点 |
+|------|------|
+| 一步登录，简单直接 | 可能触发 hCaptcha（会尝试自动解决） |
+| 任何网络环境都可以用 | 需要 Playwright + Chromium（容器 ~1GB） |
 
 ## 🚀 快速开始
 
@@ -28,16 +41,25 @@ docker compose up -d
 
 打开：**http://localhost:8000**
 
-### 2. 启用自动领取（一次性配置）
+### 2. 授权（任选其一）
 
-在 Web 界面的 **"💾 保存凭证（加密）"** 区块：
-1. 输入 Epic 账号密码
-2. 勾选"保存后启用每周自动领取"
-3. 点击保存
+**方式 A：设备码授权（推荐）**
+1. Web UI → "🎯 Epic 设备码登录" 区块
+2. 点击 "🔑 Epic 设备码授权"
+3. 复制 `user_code`，点击链接跳转到 Epic 官方授权页面
+4. 在浏览器登录 Epic 账号并授权设备
+5. Web UI 自动保存 token，之后每周自动领取无需重新登录
 
-之后每周定时（默认周四 17:00 北京时间）会自动登录并领取。
+**方式 B：账号密码**
+1. Web UI → "🔁 保存凭证 · 每周自动领取" 区块
+2. 输入 Epic 邮箱 + 密码
+3. 点击 "💾 保存凭证（加密）"
 
-### 3. Docker Compose 配置
+### 3. 等待自动领取
+
+默认调度：**每周四 17:00 北京时间**。可在 Web UI 查看历史记录。
+
+## 🐳 Docker Compose
 
 ```yaml
 services:
@@ -51,7 +73,6 @@ services:
       - TZ=Asia/Shanghai
       - SCHEDULE_DAY=thu
       - SCHEDULE_HOUR=17
-      - HEADLESS=true
       - AUTO_CLAIM_ENABLED=true
     volumes:
       - ./logs:/app/logs
@@ -61,86 +82,19 @@ services:
       - no-new-privileges:true
 ```
 
+> 📌 **多架构镜像**：支持 `linux/amd64` 和 `linux/arm64`（群晖、威联通等 ARM 设备也能跑）
+
 ## 🔐 隐私与安全
 
-### 数据流
+| 存储内容 | 加密方式 | 文件 |
+|---------|---------|------|
+| Device Auth Token | Fernet (AES-128-CBC) | `/app/data/device_auth.enc` (0600) |
+| 账号密码 | Fernet (AES-128-CBC) | `/app/data/credentials.enc` (0600) |
+| 主密钥 | 明文 | `/app/data/.env` (0600) |
 
-```
-用户浏览器
-   │ HTTPS（账号密码在内存中处理）
-   ▼
-FastAPI 进程
-   │
-   │ Fernet.encrypt()  ←  EPIC_MASTER_KEY 来自 .env
-   ▼
-/app/data/credentials.enc   ← 密文（0600 权限）
-   ▲
-   │ Fernet.decrypt()（每周定时触发）
-   ▼
-内存（领取流程中）→ 流程结束后清除 → GC 回收
-```
-
-### 加密细节
-
-- **算法**：Fernet（**AES-128-CBC** + HMAC-SHA256）
-- **文件权限**：`0600`（仅容器内 root 可读）
-- **密钥来源**：`.env` 中的 `EPIC_MASTER_KEY`（不入 git）
-
-### 威胁模型
-
-| 攻击场景 | 后果 |
-|---------|------|
-| 攻击者拿到 `credentials.enc` 但无 key | 🔒 无法解密 → 安全 |
-| 攻击者拿到 `credentials.enc` + key | ⚠️ 凭证完全泄露 |
-| 攻击者能 attach 到运行中的容器进程 | 进程内明文密码可见（仅运行时） |
-| 日志泄露 | 账号密码永不写日志（已脱敏） |
-
-### ⚠️ 重要提醒
-
-- **`EPIC_MASTER_KEY` 是唯一的防线**，请：
-  - 用密码管理器保管，不要贴到聊天/issue/截图里
-  - 定期更换（换 key 后需重新输入账号密码保存）
-- 如果怀疑 key 泄露 → 立刻删除凭证 + 换 key + 改 Epic 密码
-- **推荐用 Epic 小号而非主力号**
-
-## 📁 项目结构
-
-```
-epicgames/
-├── app/
-│   ├── main.py                # FastAPI 入口 + API 路由
-│   ├── claimer.py             # Playwright 领取核心
-│   ├── claimer_login.py       # 登录逻辑
-│   ├── claimer_login_form.py  # 表单填充
-│   ├── claimer_login_post.py  # POST 提交
-│   ├── claimer_browser.py     # 浏览器管理
-│   ├── claimer_games.py       # 游戏抓取与领取
-│   ├── claimer_captcha.py     # 验证码检测与自动处理
-│   ├── scheduler.py           # APScheduler 定时调度
-│   ├── credential_store.py    # 🔒 Fernet 加密凭证存取
-│   ├── storage.py             # 结果存储
-│   ├── config.py              # 环境变量配置
-│   ├── api_vnc.py             # VNC 状态 + 截图 API
-│   ├── api_vnc_ws.py          # VNC WebSocket 代理
-│   └── static/                # 前端资源 + noVNC
-├── scripts/
-│   ├── build-and-run.sh
-│   └── entrypoint.sh          # 🐳 容器入口（自动生成密钥）
-├── Dockerfile
-├── docker-compose.yml
-├── .env.example               # 环境变量模板
-├── .env                       # 密钥文件（自动生成，gitignore）
-├── requirements.txt
-├── logs/                      # 领取日志
-├── screenshots/               # 异常截图
-└── data/                      # 凭证密文持久化目录
-```
+**设备码模式**只存储 `{account_id, device_id, secret, access_token, refresh_token}`——**没有密码**，领取时无需重新输入。
 
 ## ⚙️ 配置
-
-所有配置通过环境变量管理。`EPIC_MASTER_KEY` 首次启动自动生��。
-
-### 环境变量
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
@@ -149,7 +103,6 @@ epicgames/
 | `SCHEDULE_DAY` | `thu` | 周几触发（mon-sun） |
 | `SCHEDULE_HOUR` | `17` | 触发小时（0-23） |
 | `SCHEDULE_MINUTE` | `0` | 触发分钟（0-59） |
-| `HEADLESS` | `true` | 浏览器无头模式 |
 | `LOG_LEVEL` | `INFO` | 日志级别 |
 | `AUTO_CLAIM_ENABLED` | `false` | 启动时自动开启自动领取 |
 
@@ -160,43 +113,88 @@ epicgames/
 | 接口 | 方法 | 说明 |
 |------|------|------|
 | `/api/health` | GET | 健康检查 |
-| `/api/claim` | POST | 立即领取 |
-| `/api/claim/verification` | POST | 提交邮箱验证码 |
+| `/api/claim` | POST | 手动领取（账号密码） |
+| `/api/device-auth/request` | POST | 申请 device code |
+| `/api/device-auth/poll/{code}` | GET | 轮询授权状态 |
+| `/api/device-auth/status` | GET | 查询 device auth 状态 |
+| `/api/device-auth/test/free-games` | POST | 调试：测试免费游戏 API |
+| `/api/device-auth/test/request` | POST | 调试：测试 device code 申请 |
+| `/api/device-auth/test/claim` | POST | 调试：用 token 测试领取流程 |
 | `/api/credentials` | POST/DELETE | 保存/删除凭证 |
 | `/api/auto-claim/toggle` | POST | 开关自动领取 |
 | `/api/history` | GET | 历史记录 |
 
 ## 🐛 故障排查
 
-### 1. 登录失败
+### 设备码授权失败
 
-Epic Games 经常改版或触发人机验证：
-- 检查 `/app/screenshots/login_failed_*.png` 截图
-- 查看 `docker compose logs -f`
+Web UI → "🛠 调试选项" → 点击 "测试免费游戏 API" 或 "测试申请 device code"——输出会显示 Epic API 的实际错误。常见原因：
 
-### 2. hCaptcha 验证
+- **Client ID 失效**：Epic 轮换公共 client ID。修改 `app/epic_api.py` 中的 `EPIC_CLIENT_ID`
+- **容器网络问题**：容器无法访问 Epic API。检查防火墙/代理
+- **被限流**：请求太频繁，等待 10 分钟
 
-如果 Epic 弹出 hCaptcha 图形验证，Web 界面会显示截图和解决指引：
+### 浏览器模式（账号密码）触发 hCaptcha
 
-1. **账号或密码错误**（🔑）：检查输入是否正确
-2. **需要 hCaptcha 验证**（🧩）：
-   - **方法 1**：在个人电脑浏览器中登录一次 Epic 账号（信任此设备）
-   - **方法 2**：添加 `ENABLE_VNC=true` 环境变量后重启，通过 VNC 手动完成验证
-   - 之后再次点击「开始领取」即可
+1. 自动点击 checkbox（最多 3 次，每次等 8 秒）
+2. 如果还在，等 30 秒让 Epic 服务端验证
+3. 如果仍然失败，错误信息会显示具体提示
 
-### 3. Master key 变更导致凭证无法解密
+### Master key 变更导致凭证无法解密
 
 ```
 ERROR 解密失败：master key 与凭证不匹配
 ```
 
-解决：Web 界面"删除凭证" → 重新保存。
+解决：Web UI → "🗑 删除凭证" → 重新保存。
 
-### 4. 想自定义密钥？
+## 🏗️ 架构
 
-编辑 `./data/.env` 修改 `EPIC_MASTER_KEY`，然后重启：
-```bash
-docker compose restart
+```
+┌──────────────────────────────────────────────────────────┐
+│  Web UI（浏览器）                                         │
+│  • 设备码登录区块 + 调试面板                                │
+│  • 账号密码区块                                            │
+│  • 自动领取开关 + 历史记录                                  │
+└──────────────────────────────────────────────────────────┘
+                           ↓
+┌──────────────────────────────────────────────────────────┐
+│  FastAPI 后端（端口 8000）                                │
+│  • /api/device-auth/*     设备码授权流程                   │
+│  • /api/claim              手动领取                        │
+│  • /api/credentials        凭证加密存取                    │
+└──────────────────────────────────────────────────────────┘
+                           ↓
+┌──────────────────────────────────────────────────────────┐
+│  Scheduler（自动选择认证模式）                              │
+│                                                          │
+│  有 device auth token?                                    │
+│    YES → EpicAPIClient（纯 HTTP，零验证码）                │
+│    NO  → EpicClaimer（Playwright + 反检测）               │
+└──────────────────────────────────────────────────────────┘
+```
+
+## 📁 项目结构
+
+```
+epicgames/
+├── app/
+│   ├── main.py                # FastAPI 入口
+│   ├── claimer.py             # Playwright 领取核心
+│   ├── claimer_login.py       # 登录逻辑 + hCaptcha
+│   ├── claimer_captcha.py     # hCaptcha 自动解决
+│   ├── claimer_games.py       # 浏览器抓取 + 领取游戏
+│   ├── epic_api.py            # 🎯 纯 HTTP API 客户端（device auth）
+│   ├── api_device_auth.py     # 设备码授权 API
+│   ├── api_vnc.py             # VNC 状态（已弃用）
+│   ├── credential_store.py    # Fernet 加密
+│   ├── scheduler.py           # 自动选择认证模式
+│   └── ...
+├── scripts/
+│   └── entrypoint.sh          # 容器入口
+├── Dockerfile
+├── docker-compose.yml
+└── README-zh-CN.md
 ```
 
 ## ⚠️ 免责声明
@@ -205,14 +203,6 @@ docker compose restart
 - 频繁自动操作可能触发账号风控
 - 作者不对账号被封、数据丢失等任何损失负责
 
-## 🏗️ 架构
+## 📝 License
 
-```
-┌──────────────┐     ┌────────────────┐     ┌──────────────────┐
-│  用户浏览器   │────▶│  FastAPI (:8000) │────▶│  Chromium         │
-│              │     │  • REST API    │     │  (Playwright)      │
-│              │     │  • Web UI      │     └──────────────────┘
-└──────────────┘     └────────────────┘
-```
-
-单端口架构：所有访问（API、Web 界面）都通过 **8000** 端口，无需额外端口映射。
+MIT
