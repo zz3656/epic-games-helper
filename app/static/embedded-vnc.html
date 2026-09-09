@@ -8,34 +8,41 @@
     <link rel="stylesheet" href="novnc/app/styles/base.css">
     <link rel="stylesheet" href="novnc/app/styles/input.css">
     <style>
-        body { margin: 0; background: #000; overflow: hidden; }
-        /* 隐藏连接面板，直接全屏 */
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: #000;
+        }
+        /* 隐藏 noVNC 默认的控制栏、状态栏等 */
         #noVNC_control_bar, #noVNC_control_bar_anchor,
-        #noVNC_status, #noVNC_connect_panel {
+        #noVNC_status, #noVNC_connect_panel,
+        #noVNC_dials, #noVNC_button_bar,
+        #noVNC_remote_pointer, #noVNC_keyboardinput {
             display: none !important;
         }
         #noVNC_container {
             position: fixed !important;
             top: 0; left: 0; right: 0; bottom: 0;
-            width: 100vw !important;
-            height: 100vh !important;
+            width: 100% !important;
+            height: 100% !important;
         }
-        /* 全屏 VNC 模式 */
-        .noVNC_center { padding-top: 20px; }
+        #noVNC_container canvas,
+        #noVNC_container img {
+            width: 100% !important;
+            height: 100% !important;
+        }
     </style>
 </head>
-<body class="noVNC_loading">
+<body>
 
-    <div id="noVNC_fallback_error" class="noVNC_center">
+    <div id="noVNC_fallback_error">
         <div>
             <div>noVNC encountered an error:</div>
             <div id="noVNC_fallback_errormsg"></div>
         </div>
-    </div>
-
-    <div id="noVNC_transition">
-        <div id="noVNC_transition_text"></div>
-        <div class="noVNC_spinner"></div>
     </div>
 
     <div id="noVNC_container">
@@ -49,55 +56,60 @@
     </audio>
 
     <script type="module">
-        // 加载 noVNC
-        import * as WebUtil from './novnc/app/webutil.js';
         import RFB from './novnc/core/rfb.js';
 
         let rfb;
 
         function connect() {
-            // 连接到同源的 WebSocket 代理
-            const host = window.location.hostname;
-            const port = window.location.port || (window.location.protocol === 'https:' ? '443' : '80');
-            const path = 'vnc-ws';
-            const password = '';
-
             rfb = new RFB({
                 target: document.getElementById('noVNC_container'),
                 encrypt: window.location.protocol === 'https:',
-                wsProtocols: ['binary'],
             });
 
             rfb.addEventListener("connect", () => {
                 console.log("VNC 连接成功");
-                document.body.classList.remove('noVNC_loading');
-                document.body.classList.add('noVNC_connecting');
-                setTimeout(() => {
-                    document.body.classList.remove('noVNC_connecting');
-                    document.body.classList.add('noVNC_connected');
-                }, 500);
+                // 连接成功后立即填充视口
+                fitToScreen();
             });
 
             rfb.addEventListener("disconnect", (e) => {
                 console.log("VNC 断开", e.detail);
-                document.body.classList.remove('noVNC_connected');
-                document.body.classList.add('noVNC_disconnected');
             });
 
-            rfb.addEventListener("credentialsrequired", () => {
-                const pw = prompt("VNC 密码:");
-                if (pw !== null) rfb.sendCredentials({ password: pw });
+            rfb.addEventListener("desktopname", () => {
+                console.log("Desktop name:", rfb.display.name);
+                // 桌面名称变更后重新适配
+                fitToScreen();
             });
 
-            // 连接到后端 WebSocket 代理
             const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${wsProtocol}//${host}:${port}/${path}`;
-
+            const wsUrl = `${wsProtocol}//${location.host}/vnc-ws`;
             console.log("连接到:", wsUrl);
-            rfb.connect(wsUrl, password);
+            rfb.connect(wsUrl, '');
         }
 
-        // 页面加载完成后自动连接
+        function fitToScreen() {
+            const container = document.getElementById('noVNC_container');
+            if (!rfb || !rfb.display) return;
+            const w = container.clientWidth;
+            const h = container.clientHeight;
+            if (w > 0 && h > 0) {
+                rfb.display.scale = 1;
+                rfb.scaleViewport = true;
+                // 触发重绘
+                rfb.display.dirty();
+                rfb.display.sync();
+            }
+        }
+
+        // 窗口大小变化时自动适配
+        let resizeTimer;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(fitToScreen, 200);
+        });
+
+        // 页面加载后自动连接
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', connect);
         } else {
