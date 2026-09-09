@@ -134,6 +134,18 @@ async def cancel_device_auth(device_code: str):
     return JSONResponse(content={"cancelled": True})
 
 
+@router.delete("/api/device-auth")
+async def delete_device_auth_endpoint():
+    """撤销已保存的 device auth"""
+    if not _credential_store:
+        raise HTTPException(status_code=500, detail="Credential store 未初始化")
+    if not _credential_store.has_device_auth():
+        raise HTTPException(status_code=404, detail="未配置 device auth")
+    if _credential_store.delete_device_auth():
+        return JSONResponse(content={"success": True, "message": "设备授权已撤销"})
+    raise HTTPException(status_code=500, detail="撤销失败")
+
+
 @router.get("/api/device-auth/status")
 async def device_auth_status():
     """查询 device auth 状态"""

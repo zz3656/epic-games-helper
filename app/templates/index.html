@@ -49,6 +49,58 @@
             <div id="result" class="result" hidden></div>
         </section>
 
+        <!-- ===== 模式 1.5：Epic 设备码登录（推荐） ===== -->
+        <section class="card highlight-top">
+            <h2>🎯 Epic 设备码登录 <span class="badge-recommended">推荐</span></h2>
+            <p class="tip">
+                ⚡ <strong>一次授权，永久免登录。</strong>用户在任意浏览器（手机/电脑）完成一次 Epic 授权，
+                之后每周自动领取都使用永不过期的 device auth token。
+            </p>
+            <p class="hint">
+                ✨ <strong>优势：</strong>不需保存账号密码 · 不需 Playwright/Chromium 依赖
+                · 不会触发 hCaptcha · 容器体积从 1GB 降到 ~150MB
+            </p>
+
+            <div id="device-auth-status" class="cred-status">
+                <span class="status-dot"></span>
+                <span id="device-auth-status-text">加载中…</span>
+            </div>
+
+            <div class="btn-row">
+                <button type="button" id="start-device-auth-btn" class="btn-primary">
+                    <span class="btn-text">🔑 Epic 设备码授权</span>
+                    <span class="btn-spinner" hidden>授权中…</span>
+                </button>
+                <button type="button" id="delete-device-auth-btn" class="btn-danger" hidden>🗑 撤销授权</button>
+            </div>
+
+            <!-- 设备码授权进行中 -->
+            <div id="device-auth-flow" hidden>
+                <div class="device-code-box">
+                    <div class="device-code-label">请在浏览器中输入此代码：</div>
+                    <div class="device-code-value" id="device-code-value">------</div>
+                    <div class="device-code-hint">⏱ 代码 10 分钟内有效</div>
+                </div>
+
+                <div class="verification-uri-box">
+                    <div class="verification-uri-label">点击下方按钮在浏览器中打开 Epic 授权页面：</div>
+                    <a id="verification-uri-link" href="#" target="_blank" class="btn-primary btn-large">
+                        🌐 打开 Epic 授权页面
+                    </a>
+                    <div class="verification-uri-tip">打开后使用你的 Epic 账号登录并授权设备</div>
+                </div>
+
+                <div class="device-auth-status-box">
+                    <div class="polling-spinner">⏳</div>
+                    <div id="device-auth-poll-msg">等待你在浏览器完成授权...</div>
+                </div>
+
+                <button type="button" id="cancel-device-auth-btn" class="btn-secondary">取消授权</button>
+            </div>
+
+            <div id="device-auth-result" class="result" hidden></div>
+        </section>
+
         <!-- ===== 模式 2：保存凭证 + 自动领取 ===== -->
         <section class="card highlight">
             <h2>🔁 保存凭证 · 每周自动领取</h2>
@@ -140,5 +192,6 @@
 
     <script src="/static/app.js"></script>
     <script src="/static/claim.js"></script>
+    <script src="/static/device_auth.js"></script>
 </body>
 </html>
