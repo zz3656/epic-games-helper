@@ -71,6 +71,42 @@ async def try_solve_hcaptcha(page: Page) -> bool:
     return False
 
 
+async def wait_for_manual_captcha_solve(page: Page, timeout_seconds: int = 120) -> bool:
+    """等待用户手动解决 hCaptcha
+
+    期间轮询检查 hCaptcha iframe 是否消失或页面是否已跳转。
+    hCaptcha 消失后等待 3 秒稳定期再返回。
+    返回 True 表示 hCaptcha 已被解决。
+    """
+    interval = 5
+    max_checks = timeout_seconds // interval
+    captcha_disappeared_time = None
+
+    for wait_idx in range(max_checks):
+        await asyncio.sleep(interval)
+
+        still_captcha = await page.evaluate("""
+        () => !!document.querySelector('iframe[src*="hcaptcha"]')
+        """)
+
+        if "id.epicgames.com" not in page.url:
+            logger.info("页面已跳转")
+            return True
+
+        if not still_captcha:
+            if captcha_disappeared_time is None:
+                captcha_disappeared_time = asyncio.get_event_loop().time()
+            else:
+                elapsed = asyncio.get_event_loop().time() - captcha_disappeared_time
+                if elapsed >= 3:
+                    logger.info("hCaptcha 已消失，等待稳定期完成")
+                    return True
+        else:
+            captcha_disappeared_time = None
+
+    return False
+
+
 async def wait_for_hcaptcha_auto_resolve(page: Page, timeout_seconds: int = 15) -> bool:
     """等待 hCaptcha 自动解决（低风险场景）
 
