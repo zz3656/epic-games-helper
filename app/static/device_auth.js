@@ -27,9 +27,10 @@ const autoStatusText = document.getElementById("auto-status-text");
 // 进度轮询定时器
 let claimProgressTimer = null;
 
-// 免费游戏卡片
-const freeGamesGrid = document.getElementById("free-games-grid");
-const freeGamesHint = document.getElementById("free-games-hint");
+// 本账号游戏库（仅在已授权时显示）
+const accountGamesSection = document.getElementById("account-games-section");
+const accountGamesGrid = document.getElementById("account-games-grid");
+const accountGamesHint = document.getElementById("account-games-hint");
 
 // ============ 启动设备码授权 ============
 startDeviceAuthBtn.addEventListener("click", async () => {
@@ -275,9 +276,11 @@ async function refreshDeviceAuthStatus() {
             deviceAuthStatusText.innerHTML = "✓ 已通过 Epic 设备码授权（永不过期）";
             deleteDeviceAuthBtn.hidden = false;
             startDeviceAuthBtn.hidden = true;
-            // 显示立即领取和自动领取
+            // 显示立即领取、自动领取和账号游戏库
             manualClaimSection.hidden = false;
             autoClaimSection.hidden = false;
+            accountGamesSection.hidden = false;
+            loadAccountGames();
         } else {
             deviceAuthStatus.classList.remove("configured");
             deviceAuthStatus.classList.add("empty");
@@ -286,6 +289,7 @@ async function refreshDeviceAuthStatus() {
             startDeviceAuthBtn.hidden = false;
             manualClaimSection.hidden = true;
             autoClaimSection.hidden = true;
+            accountGamesSection.hidden = true;
         }
         updateAutoStatus(autoData.auto_claim_enabled);
     } catch (err) {
@@ -361,27 +365,32 @@ function daysUntilEnd(endIso) {
     } catch { return null; }
 }
 
-async function loadFreeGames() {
-    if (!freeGamesGrid) return;
+async function loadAccountGames() {
+    if (!accountGamesGrid) return;
+    accountGamesHint.textContent = "加载中…";
     try {
         const resp = await fetch("/api/free-games");
         const data = await resp.json();
         if (!data.success) {
-            freeGamesGrid.innerHTML = `<div class="empty-state">加载失败：${escapeHtml(data.error || "")}</div>`;
-            freeGamesHint.textContent = "本周免费游戏加载失败";
+            accountGamesGrid.innerHTML = `<div class="empty-state">加载失败：${escapeHtml(data.error || "")}</div>`;
+            accountGamesHint.textContent = "加载失败";
+            console.error("free-games API 返回失败:", data);
             return;
         }
 
         const games = data.games || [];
+        const ownedGames = games.filter(g => g.already_owned);
+        const claimableGames = games.filter(g => !g.already_owned);
+
         if (games.length === 0) {
-            freeGamesGrid.innerHTML = `<div class="empty-state">📭 本周暂无免费游戏</div>`;
-            freeGamesHint.textContent = "本周暂无免费游戏";
+            accountGamesGrid.innerHTML = `<div class="empty-state">📭 本周暂无免费游戏</div>`;
+            accountGamesHint.textContent = "本周暂无免费游戏";
             return;
         }
 
-        freeGamesHint.textContent = `本周共 ${games.length} 款免费游戏可领取`;
+        accountGamesHint.textContent = `本周 ${claimableGames.length} 款可领取 · ${ownedGames.length} 款已拥有`;
 
-        freeGamesGrid.innerHTML = games.map(g => {
+        accountGamesGrid.innerHTML = games.map(g => {
             const owned = g.already_owned;
             const daysLeft = daysUntilEnd(g.end_date);
             const datesHtml = g.start_date || g.end_date
@@ -421,8 +430,9 @@ async function loadFreeGames() {
             `;
         }).join("");
     } catch (err) {
-        console.error("加载免费游戏失败:", err);
-        if (freeGamesHint) freeGamesHint.textContent = "加载失败";
+        console.error("加载账号游戏库失败:", err);
+        accountGamesHint.textContent = "加载失败";
+        accountGamesGrid.innerHTML = `<div class="empty-state">加载失败：${escapeHtml(String(err))}</div>`;
     }
 }
 
@@ -480,5 +490,4 @@ document.getElementById("test-claim-btn").addEventListener("click", async () => 
 
 // 页面加载时初始化
 refreshDeviceAuthStatus();
-loadFreeGames();
 loadHistory();

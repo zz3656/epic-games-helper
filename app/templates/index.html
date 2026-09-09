@@ -16,13 +16,6 @@
         <!-- 状态横幅 -->
         <div id="status-banner" class="banner info" hidden></div>
 
-        <!-- ===== 本周免费游戏卡片展示 ===== -->
-        <section class="card" id="free-games-section">
-            <h2>🎁 本周可免费领取的游戏</h2>
-            <p class="hint" id="free-games-hint">加载中…</p>
-            <div id="free-games-grid" class="game-grid"></div>
-        </section>
-
         <!-- ===== 单一认证区：设备码登录 ===== -->
         <section class="card highlight-top">
             <h2>🎯 Epic 设备码登录 <span class="badge-recommended">推荐</span></h2>
@@ -81,6 +74,13 @@
                     <span class="btn-spinner" hidden>领取中…</span>
                 </button>
                 <div id="manual-claim-result" class="result" hidden></div>
+            </div>
+
+            <!-- 本账号的游戏库（设备码已授权时显示） -->
+            <div id="account-games-section" hidden>
+                <h3 style="margin-top:20px;">👤 本账号的游戏库</h3>
+                <p class="hint" id="account-games-hint">加载中…</p>
+                <div id="account-games-grid" class="game-grid"></div>
             </div>
 
             <!-- 自动领取开关（设备码已授权时显示） -->
