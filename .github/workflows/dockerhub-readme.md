@@ -75,6 +75,33 @@ services:
       - no-new-privileges:true
 ```
 
+**启用 VNC（手动验证 hCaptcha 用）：**
+
+```yaml
+services:
+  epic-claimer:
+    image: zz3656/epic-games-claimer:latest
+    container_name: epic-games-claimer
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+      - "6080:6080"   # noVNC Web 端口
+    environment:
+      - TZ=Asia/Shanghai
+      - SCHEDULE_DAY=thu
+      - SCHEDULE_HOUR=17
+      - HEADLESS=true
+      - AUTO_CLAIM_ENABLED=true
+      - ENABLE_VNC=true
+      # - VNC_PASSWORD=yourpassword   # 可选
+    volumes:
+      - ./logs:/app/logs
+      - ./screenshots:/app/screenshots
+      - ./data:/app/data
+    security_opt:
+      - no-new-privileges:true
+```
+
 启动：
 ```bash
 docker compose up -d
@@ -115,6 +142,8 @@ docker compose up -d
 | `HEADLESS` | `true` | 浏览器无头模式 |
 | `LOG_LEVEL` | `INFO` | 日志级别 |
 | `AUTO_CLAIM_ENABLED` | `false` | 启动时自动开启自动领取 |
+| `ENABLE_VNC` | `false` | 启动 VNC 服务（手动验证 hCaptcha） |
+| `VNC_PASSWORD` | *(空)* | VNC 访问密码（不设置则无密码） |
 
 ### 自定义密钥
 
@@ -139,6 +168,10 @@ docker compose restart
 **登录失败** — Epic 经常改版或触发人机验证：
 - 检查 `/app/screenshots/login_failed_*.png` 截图
 - 查看容器日志：`docker compose logs -f`
+
+**hCaptcha 验证** — Epic 触发图形验证码时：
+- **启用 VNC**：`docker-compose.yml` 添加 `ENABLE_VNC=true` 和 `6080:6080` 端口，重启后领取失败会显示 noVNC 链接
+- **不启用 VNC**：等待 5-10 分钟 hCaptcha 冷却后重试
 
 **Master key 变更后凭证无法解密**：
 ```bash

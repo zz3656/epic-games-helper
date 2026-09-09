@@ -48,6 +48,59 @@ cat ./data/.env
 - 关闭开关：Web 界面 → "自动领取开关"
 - 删除凭证：Web 界面 → "🗑 删除凭证" 按钮
 
+### 5. Docker Compose 配置示例
+
+默认配置（不启用 VNC）：
+
+```yaml
+services:
+  epic-claimer:
+    image: zz3656/epic-games-claimer:latest
+    container_name: epic-games-claimer
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - TZ=Asia/Shanghai
+      - SCHEDULE_DAY=thu
+      - SCHEDULE_HOUR=17
+      - HEADLESS=true
+      - AUTO_CLAIM_ENABLED=true
+    volumes:
+      - ./logs:/app/logs
+      - ./screenshots:/app/screenshots
+      - ./data:/app/data
+    security_opt:
+      - no-new-privileges:true
+```
+
+启用 VNC（手动验证 hCaptcha）：
+
+```yaml
+services:
+  epic-claimer:
+    image: zz3656/epic-games-claimer:latest
+    container_name: epic-games-claimer
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+      - "6080:6080"   # noVNC Web 端口
+    environment:
+      - TZ=Asia/Shanghai
+      - SCHEDULE_DAY=thu
+      - SCHEDULE_HOUR=17
+      - HEADLESS=true
+      - AUTO_CLAIM_ENABLED=true
+      - ENABLE_VNC=true
+      # - VNC_PASSWORD=yourpassword    # 可选
+    volumes:
+      - ./logs:/app/logs
+      - ./screenshots:/app/screenshots
+      - ./data:/app/data
+    security_opt:
+      - no-new-privileges:true
+```
+
 ## 🔐 隐私与安全
 
 ### 数据流
@@ -161,6 +214,17 @@ Epic 经常改版或触发人机验证：
 - 设置 `HEADLESS=false` 调试（需要 X11 转发，配置复杂）
 - 检查 `/app/screenshots/login_failed_*.png` 截图
 - 查看 `docker compose logs -f`
+
+### 1.5. hCaptcha 验证
+
+如果 Epic 弹出 hCaptcha 图形验证，Web 界面会明确提示三种情况：
+
+1. **账号或密码错误**（🔑）：检查输入是否正确
+2. **需要 hCaptcha 验证**（🧩）：需要手动验证
+   - **启用 VNC 后**：领取失败时点不蓝色「🎯 点击这里打开 noVNC」按钮，新窗口打开 noVNC 后手动完成 hCaptcha
+   - **未启用 VNC**：按 Web 界面提示的步骤修改 docker-compose.yml，添加 `ENABLE_VNC=true` 和 `6080:6080` 端口，重启后重新领取
+
+详细配置参见上文「Docker Compose 配置示例」一节。
 
 ### 2. Master key 变更导致凭证无法解密
 
