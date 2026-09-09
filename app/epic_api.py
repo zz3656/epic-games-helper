@@ -429,6 +429,7 @@ class EpicAPIClient:
                 purchase_headers["X-XSRF-TOKEN"] = xsrf_token
 
             # 第一步：创建订单
+            logger.info("🔥 请求 Epic 购买: offer_id=%s namespace=%s", game.offer_id, game.offer_id.split("/")[0] if "/" in game.offer_id else "")
             purchase_resp = await self.client.post(
                 "https://www.epicgames.com/store/purchase",
                 headers=purchase_headers,
@@ -442,9 +443,9 @@ class EpicAPIClient:
                     "namespace": game.offer_id.split("/")[0] if "/" in game.offer_id else "",
                 },
             )
-
             purchase_status = purchase_resp.status_code
             purchase_text = purchase_resp.text
+            logger.info("🔥 购买响应: status=%d text=%s", purchase_status, purchase_text[:500] if purchase_text else "(empty)")
 
             if purchase_status == 409:
                 return ("already_claimed", "已拥有")
@@ -506,10 +507,17 @@ class EpicAPIClient:
                 logger.info("游戏领取响应 200: %s", game.title)
                 return ("claimed", "已成功领取")
 
-            # 其他情况
+            # 其他情况：返回完整错误信息
             logger.warning("领取失败 %s: HTTP %s %s",
-                           game.title, purchase_status, purchase_text[:300] if purchase_text else "(empty)")
-            return ("failed", f"领取失败: HTTP {purchase_status}")
+                           game.title, purchase_status, purchase_text[:500] if purchase_text else "(empty)")
+            # 尝试解析错误信息
+            error_msg = f"HTTP {purchase_status}"
+            if purchase_data and isinstance(purchase_data, dict):
+                error_detail = purchase_data.get("message") or purchase_data.get("error") or purchase_data.get("errorCode") or ""
+                if error_detail:
+                    error_msg = f"HTTP {purchase_status}: {error_detail}"
+                    logger.info("Epic 错误详情: %s", error_detail)
+            return ("failed", error_msg)
         except Exception as e:
             logger.exception("领取异常: %s", game.title)
             return ("failed", f"领取异常: {e}")
