@@ -2,24 +2,28 @@ version: "3.8"
 
 services:
   epic-claimer:
-    build: .
+    image: zz3656/epic-games-claimer:latest
     container_name: epic-games-claimer
+    build: .
     restart: unless-stopped
     ports:
       - "8000:8000"
     environment:
-      - ENABLE_VNC=true
+      - TZ=Asia/Shanghai
+      - SCHEDULE_DAY=thu
+      - SCHEDULE_HOUR=17
+      - SCHEDULE_MINUTE=0
+      - AUTO_CLAIM_ENABLED=true
+      - LOG_LEVEL=INFO
     volumes:
-      # 仅挂载日志、截图、数据，账号密码密文在 /app/data 下
+      # 持久化加密的 device auth + 日志 + 截图
       - ./logs:/app/logs
       - ./screenshots:/app/screenshots
       - ./data:/app/data
-    # 安全加固
     security_opt:
       - no-new-privileges:true
-    # 资源限制
     deploy:
       resources:
         limits:
-          memory: 2G
-          cpus: "1.5"
+          memory: 512M
+          cpus: "1.0"

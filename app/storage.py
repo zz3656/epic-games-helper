@@ -10,7 +10,7 @@ import threading
 from collections import deque
 from typing import List
 
-from app.claimer import ClaimResult
+from app.result import ClaimResult
 
 logger = logging.getLogger(__name__)
 

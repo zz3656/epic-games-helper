@@ -9,42 +9,40 @@
 
 ---
 
-## ✨ 两种登录方式
-
-### 🎯 推荐：**设备码授权**（零验证码）
-
-> 用户在自己浏览器完成一次 Epic 授权，工具获得永不过期的 token。**零 hCaptcha、零 Playwright**。
+## ✨ 单一认证方式：**设备码授权**
 
 - ⚡ 一次授权永久使用
 - 🚫 零 hCaptcha / 零自动化检测
-- 📦 容器体积从 ~1GB 降到 ~150MB（无 Chromium）
+- 📦 容器体积仅 ~150MB（无 Chromium）
 - 🛡️ 服务器 IP 不会被 Epic 风控
 - ♾️ Token 永不过期（除非手动撤销）
-
-### 🔐 备选：**账号密码**（浏览器自动化）
-
-Playwright + 反检测 stealth。偶尔会遇到 hCaptcha，会自动重试。
 
 ---
 
 ## 🚀 快速开始
 
-### Docker Run
-
 ```bash
-docker pull zz3656/epic-games-claimer:latest
-
 docker run -d \
   --name epic-claimer \
   -p 8000:8000 \
-  -v $(pwd)/logs:/app/logs \
-  -v $(pwd)/screenshots:/app/screenshots \
   -v $(pwd)/data:/app/data \
   --restart unless-stopped \
   zz3656/epic-games-claimer:latest
 ```
 
-### Docker Compose（推荐）
+打开 **http://localhost:8000**
+
+1. 进入 "🎯 Epic 设备码登录" 区块
+2. 点击 "🔑 Epic 设备码授权"
+3. 复制 `user_code`，点击链接跳转 Epic 官方授权页
+4. 在自己浏览器登录 Epic 账号并授权设备
+5. 完成后 Web UI 自动保存 token
+
+之后每周自动领取，无需任何操作。
+
+---
+
+## 🐳 Docker Compose
 
 ```yaml
 services:
@@ -60,33 +58,10 @@ services:
       - SCHEDULE_HOUR=17
       - AUTO_CLAIM_ENABLED=true
     volumes:
-      - ./logs:/app/logs
-      - ./screenshots:/app/screenshots
       - ./data:/app/data
     security_opt:
       - no-new-privileges:true
 ```
-
-启动：
-```bash
-docker compose up -d
-```
-
-### 4. 访问 Web 界面
-
-打开 **http://localhost:8000**
-
-**推荐流程：**
-1. 进入 "🎯 Epic 设备码登录" 区块
-2. 点击 "🔑 Epic 设备码授权"
-3. 复制 `user_code`，点击链接跳转 Epic 官方授权页
-4. 在自己浏览器登录 Epic 账号并授权设备
-5. 完成后 Web UI 自动保存 token
-
-之后每周自动领取，无需任何操作。
-
-**备选流程**（设备码不可用时）：
-- "🔁 保存凭证" 区块输入账号密码
 
 ---
 
@@ -95,10 +70,9 @@ docker compose up -d
 | 存储 | 加密 | 文件 |
 |---|---|---|
 | Device Auth Token | Fernet (AES-128-CBC) | `/app/data/device_auth.enc` (0600) |
-| 账号密码 | Fernet (AES-128-CBC) | `/app/data/credentials.enc` (0600) |
 | Master key | 明文 | `/app/data/.env` (0600) |
 
-**设备码模式只存储 token，不存储密码。**
+**只存储 token，不存储密码。**
 
 ---
 
@@ -131,12 +105,10 @@ docker compose up -d
 
 **设备码授权失败** — 在 Web UI "🛠 调试选项" 板块点击测试按钮，输出会显示 Epic API 的实际错误。
 
-**账号密码模式遇到 hCaptcha** — 自动点击 + 30 秒等待；如果仍然失败，等几分钟后重试。
-
 **Master key 不匹配**：
 ```bash
-rm ./data/credentials.enc ./data/device_auth.enc
-# Web 界面重新保存凭证
+rm ./data/device_auth.enc
+# Web 界面重新授权
 ```
 
 ---

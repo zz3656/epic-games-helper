@@ -1,19 +1,19 @@
 """
-Device Auth 申请与轮询 API（从 main.py 拆分）
+Device Auth 申请与轮询 API
 
 用户在自己浏览器完成 Epic 登录授权后，工具获得永不过期的 device auth token。
+之后调用 Epic HTTP API 完成领取，无需浏览器、无需 hCaptcha。
 """
 import asyncio
 import logging
-import os
 import time
-from typing import Dict, Optional
+from typing import Dict, Any
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from app.epic_api import EpicAPIClient, DeviceAuthCredentials
+from app.epic_api import EpicAPIClient
 
 logger = logging.getLogger(__name__)
 

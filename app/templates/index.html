@@ -16,7 +16,7 @@
         <!-- 状态横幅 -->
         <div id="status-banner" class="banner info" hidden></div>
 
-        <!-- ===== 单一认证区：设备码登录（推荐） ===== -->
+        <!-- ===== 单一认证区：设备码登录 ===== -->
         <section class="card highlight-top">
             <h2>🎯 Epic 设备码登录 <span class="badge-recommended">推荐</span></h2>
             <p class="tip">
@@ -108,57 +108,6 @@
             </details>
         </section>
 
-        <!-- ===== 备选：账号密码登录（高级用户） ===== -->
-        <details class="card">
-            <summary style="cursor:pointer; color:#cbd5e1; font-weight:600; font-size:16px;">
-                ⚙️ 备选方案：账号密码登录（高级用户）
-            </summary>
-
-            <div style="margin-top:16px;">
-                <p class="hint">
-                    适用于无法使用设备码的环境。账号密码会被加密保存到容器内，
-                    每周自动领取时解密使用。Playwright 自动登录会触发 hCaptcha（会自动重试）。
-                </p>
-                <p class="hint">
-                    ⚠️ <strong>与设备码方案互斥：</strong>同时启用时优先使用设备码。
-                </p>
-
-                <div id="cred-status" class="cred-status">
-                    <span class="status-dot"></span>
-                    <span id="cred-status-text">加载中…</span>
-                </div>
-
-                <form id="save-form">
-                    <div class="form-group">
-                        <label for="save-username">Epic 账号（邮箱）</label>
-                        <input type="text" id="save-username" name="username"
-                               autocomplete="username" placeholder="your-email@example.com">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="save-password">Epic 密码</label>
-                        <div class="password-wrap">
-                            <input type="password" id="save-password" name="password"
-                                   autocomplete="new-password" placeholder="请输入密码">
-                            <button type="button" id="toggle-save-pwd" class="toggle-pwd" title="显示/隐藏密码">👁</button>
-                        </div>
-                    </div>
-
-                    <div class="btn-row">
-                        <button type="submit" id="save-btn" class="btn-primary">
-                            <span class="btn-text">💾 保存凭证（加密）</span>
-                            <span class="btn-spinner" hidden>保存中…</span>
-                        </button>
-                        <button type="button" id="delete-btn" class="btn-danger" hidden>🗑 删除凭证</button>
-                        <button type="button" id="quick-claim-btn" class="btn-secondary">🚀 立即领取（用此账号）</button>
-                    </div>
-                </form>
-
-                <div id="save-result" class="result" hidden></div>
-                <div id="quick-claim-result" class="result" hidden></div>
-            </div>
-        </details>
-
         <!-- ===== 历史 ===== -->
         <section class="card">
             <h2>📜 历史记录</h2>
@@ -170,11 +119,10 @@
 
         <footer>
             <p>🔒 设备码授权：token 永不过期（除非你撤销）</p>
-            <p>⚙️ 账号密码模式：凭证以 AES-128-CBC 加密后持久化</p>
+            <p>📦 镜像仅 ~150MB（无 Chromium/Playwright）</p>
         </footer>
     </div>
 
-    <script src="/static/app.js"></script>
     <script src="/static/device_auth.js"></script>
 </body>
 </html>

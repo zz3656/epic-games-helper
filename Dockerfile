@@ -1,52 +1,20 @@
 # 使用官方 Python 3.11 slim 镜像
+# 不再需要 Chromium/GTK/X11/VNC/Playwright，镜像体积从 ~1GB 降到 ~200MB
 FROM python:3.11-slim
 
 # 设置环境变量
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONDONTWRITEBYTECCODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     DEBIAN_FRONTEND=noninteractive
 
-# 安装系统依赖（Playwright 浏览器运行所需）
-# 注意：VNC 相关依赖已移除，改为纯截图方案处理 hCaptcha
+# 安装系统依赖（仅 HTTP API 客户端所需）
+# 不需要 Chromium / Playwright / VNC / X11
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
-    gnupg \
     ca-certificates \
-    fonts-liberation \
-    fonts-noto-cjk \
-    libasound2 \
-    libatk-bridge2.0-0 \
-    libatk1.0-0 \
-    libc6 \
-    libcairo2 \
-    libcups2 \
-    libdbus-1-3 \
-    libexpat1 \
-    libfontconfig1 \
-    libgbm1 \
-    libgcc-s1 \
-    libglib2.0-0 \
-    libgtk-3-0 \
-    libnspr4 \
-    libnss3 \
-    libpango-1.0-0 \
-    libpangocairo-1.0-0 \
-    libstdc++6 \
-    libx11-6 \
-    libx11-xcb1 \
-    libxcb1 \
-    libxcomposite1 \
-    libxcursor1 \
-    libxdamage1 \
-    libxext6 \
-    libxfixes3 \
-    libxi6 \
-    libxrandr2 \
-    libxrender1 \
-    libxss1 \
-    libxtst6 \
+    tzdata \
     && rm -rf /var/lib/apt/lists/*
 
 # 创建工作目录
@@ -58,15 +26,12 @@ COPY requirements.txt .
 # 安装 Python 依赖
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 安装 Playwright 浏览器（Chromium）
-RUN playwright install chromium
-
 # 复制应用代码
 COPY app/ ./app/
 COPY scripts/ ./scripts/
 
-# 创建日志和下载目录
-RUN mkdir -p /app/logs /app/screenshots
+# 创建数据目录
+RUN mkdir -p /app/logs /app/screenshots /app/data
 
 # 复制启动脚本
 COPY scripts/entrypoint.sh /entrypoint.sh
