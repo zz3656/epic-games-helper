@@ -179,6 +179,49 @@ async def test_fetch_free_games():
         }, status_code=500)
 
 
+@router.post("/api/device-auth/test/free-games-raw")
+async def test_fetch_free_games_raw():
+    """调试接口：查看 Epic API 原始返回（诊断用）"""
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as c:
+            resp = await c.get(
+                "https://store-site-backend-static.ak.epicgames.com/freeGamesPromotions",
+                params={"locale": "zh-CN", "country": "CN", "allowCountries": "CN"},
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                                  "AppleWebKit/537.36 (KHTML, like Gecko) "
+                                  "Chrome/141.0.0.0 Safari/537.36",
+                },
+            )
+            data = resp.json()
+            elements = data.get("data", {}).get("Catalog", {}).get("searchStore", {}).get("elements", [])
+            # 提取每个游戏的 promotions 信息
+            summary = []
+            for item in elements[:20]:  # 只看前 20 个
+                title = item.get("title", "")
+                promos = item.get("promotions", {})
+                prom_offers = promos.get("promotionalOffers", [])
+                upcoming = promos.get("upcomingPromotionalOffers", [])
+                summary.append({
+                    "title": title,
+                    "promotional_offers_count": len(prom_offers),
+                    "upcoming_offers_count": len(upcoming),
+                    "promotional_offers_sample": prom_offers[:1] if prom_offers else [],
+                    "price_total": item.get("price", {}).get("totalPrice", {}).get("fmtPrice", {}),
+                })
+            return JSONResponse(content={
+                "success": True,
+                "total_elements": len(elements),
+                "summary": summary,
+            })
+    except Exception as e:
+        return JSONResponse(content={
+            "success": False,
+            "error": str(e),
+        }, status_code=500)
+
+
 @router.post("/api/device-auth/test/request")
 async def test_request_device_code():
     """调试接口：测试申请 device code（不存储）"""
