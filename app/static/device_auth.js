@@ -159,3 +159,44 @@ function showDeviceAuthResult(data) {
 
 // 页面加载时初始化
 refreshDeviceAuthStatus();
+
+// ============ 调试按钮 ============
+const debugOutput = document.getElementById("device-auth-debug-output");
+
+function setDebugOutput(obj) {
+    debugOutput.textContent = JSON.stringify(obj, null, 2);
+}
+
+document.getElementById("test-free-games-btn").addEventListener("click", async () => {
+    debugOutput.textContent = "⏳ 测试中...";
+    try {
+        const resp = await fetch("/api/device-auth/test/free-games", { method: "POST" });
+        const data = await resp.json();
+        setDebugOutput(data);
+    } catch (err) {
+        setDebugOutput({ success: false, error: err.message });
+    }
+});
+
+document.getElementById("test-device-code-btn").addEventListener("click", async () => {
+    debugOutput.textContent = "⏳ 申请中...";
+    try {
+        const resp = await fetch("/api/device-auth/test/request", { method: "POST" });
+        const data = await resp.json();
+        setDebugOutput(data);
+    } catch (err) {
+        setDebugOutput({ success: false, error: err.message });
+    }
+});
+
+document.getElementById("test-claim-btn").addEventListener("click", async () => {
+    if (!confirm("将使用已保存的 device auth token 测试领取流程（需先完成授权）。继续？")) return;
+    debugOutput.textContent = "⏳ 领取中（可能需要几秒）...";
+    try {
+        const resp = await fetch("/api/device-auth/test/claim", { method: "POST" });
+        const data = await resp.json();
+        setDebugOutput(data);
+    } catch (err) {
+        setDebugOutput({ success: false, error: err.message });
+    }
+});

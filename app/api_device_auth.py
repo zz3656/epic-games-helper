@@ -155,3 +155,100 @@ async def device_auth_status():
     return JSONResponse(content={
         "device_auth_configured": configured,
     })
+
+
+@router.post("/api/device-auth/test/free-games")
+async def test_fetch_free_games():
+    """调试接口：测试免费游戏 API（无需登录）"""
+    from app.epic_api import EpicAPIClient
+    try:
+        async with EpicAPIClient() as client:
+            games = await client.fetch_free_games()
+        return JSONResponse(content={
+            "success": True,
+            "count": len(games),
+            "games": [
+                {"title": g.title, "offer_id": g.offer_id, "url": g.url}
+                for g in games
+            ],
+        })
+    except Exception as e:
+        return JSONResponse(content={
+            "success": False,
+            "error": str(e),
+        }, status_code=500)
+
+
+@router.post("/api/device-auth/test/request")
+async def test_request_device_code():
+    """调试接口：测试申请 device code（不存储）"""
+    from app.epic_api import EpicAPIClient
+    try:
+        async with EpicAPIClient() as client:
+            device_code, user_code, verification_uri, expires_in = \
+                await client.request_device_code()
+        return JSONResponse(content={
+            "success": True,
+            "user_code": user_code,
+            "verification_uri": verification_uri,
+            "verification_uri_complete": f"{verification_uri}?code={user_code}" if "?" not in verification_uri else verification_uri,
+            "expires_in": expires_in,
+            "device_code_preview": device_code[:10] + "...",
+        })
+    except Exception as e:
+        return JSONResponse(content={
+            "success": False,
+            "error": str(e),
+        }, status_code=500)
+
+
+@router.post("/api/device-auth/test/claim")
+async def test_claim_with_device_auth():
+    """调试接口：用 device auth token 测试领取流程
+
+    必须先完成设备码授权才能使用。
+    """
+    if not _credential_store or not _credential_store.has_device_auth():
+        return JSONResponse(content={
+            "success": False,
+            "error": "未配置 device auth，请先完成设备码授权",
+        }, status_code=400)
+
+    from app.epic_api import EpicAPIClient
+    credentials = _credential_store.load_device_auth()
+    if not credentials:
+        return JSONResponse(content={
+            "success": False,
+            "error": "读取 device auth 失败",
+        }, status_code=500)
+
+    try:
+        async with EpicAPIClient() as client:
+            games = await client.fetch_free_games()
+            if not games:
+                return JSONResponse(content={
+                    "success": True,
+                    "message": "本周暂无免费游戏",
+                    "games": [],
+                })
+
+            results = []
+            for game in games:
+                status, message = await client.claim_game(credentials, game)
+                results.append({
+                    "title": game.title,
+                    "offer_id": game.offer_id,
+                    "status": status,
+                    "message": message,
+                })
+
+            return JSONResponse(content={
+                "success": True,
+                "games": results,
+            })
+    except Exception as e:
+        logger.exception("测试领取失败")
+        return JSONResponse(content={
+            "success": False,
+            "error": str(e),
+        }, status_code=500)

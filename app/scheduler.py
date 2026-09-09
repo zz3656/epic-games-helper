@@ -1,4 +1,16 @@
-"""定时调度：每周触发自动领取（支持凭证持久化模式）"""
+"""
+定时调度：每周触发自动领取
+
+支持两种认证模式（自动选择）：
+1. Device Auth（优先）：纯 HTTP API，无浏览器、无 hCaptcha
+2. 账号密码（降级）：Playwright 自动登录 + 浏览器领取
+
+Device Auth 流程：
+- 用户在 Web UI 申请 device code
+- 在任意浏览器完成 Epic 授权
+- 工具获得永不过期的 device auth token
+- 后续领取直接调用 Epic API
+"""
 import asyncio
 import logging
 from datetime import datetime
@@ -7,15 +19,13 @@ from typing import Any, Callable, Optional
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from app.claimer import EpicClaimer, ClaimResult
+from app.claimer import EpicClaimer, ClaimResult, FreeGame
 from app.config import Config, DAY_MAP
 from app.credential_store import CredentialStore, StoredCredential
+from app.epic_api import EpicAPIClient, DeviceAuthCredentials
 from app.storage import ResultStore
 
 logger = logging.getLogger(__name__)
-
-# 全局进度回调（供手动触发时传递）
-_progress_callbacks: dict[str, Callable] = {}
 
 
 class ClaimScheduler:
@@ -72,9 +82,10 @@ class ClaimScheduler:
             self.scheduler.shutdown(wait=False)
             logger.info("调度器已关闭")
 
-    async def run_now(self, username: str, password: str, on_progress: Optional[Callable] = None,
+    async def run_now(self, username: str, password: str,
+                       on_progress: Optional[Callable] = None,
                        verification_code: Optional[str] = None) -> ClaimResult:
-        """手动触发一次领取"""
+        """手动触发一次领取（使用账号密码）"""
         if self._lock.locked():
             return ClaimResult(
                 success=False, username=username,
@@ -89,36 +100,122 @@ class ClaimScheduler:
             return result
 
     async def _run_scheduled_job(self):
-        """定时任务入口：从凭证存储加载并执行"""
+        """定时任务入口：自动选择认证方式"""
         if not self.auto_claim_enabled:
             logger.info("定时任务触发，但自动领取未启用，跳过")
             return
 
-        cred = self.cred_store.load()
-        if not cred:
-            logger.warning("定时任务触发，但未配置凭证，跳过")
+        if self._lock.locked():
+            logger.warning("定时任务：已有任务执行中，跳过本次")
             return
 
-        username = cred.username
-        password = cred.password
-        try:
-            if self._lock.locked():
-                logger.warning("定时任务：已有任务执行中，跳过本次")
-                return
-            async with self._lock:
-                logger.info("定时任务开始：用户 %s", _mask(username))
-                result = await self._execute(username, password)
-                self._last_result = result
-                self.store.add(result)
-        finally:
-            # 清空凭证引用
-            cred.clear()
-            username = None
-            password = None
+        async with self._lock:
+            # 优先用 device auth（无需密码、无浏览器、无 hCaptcha）
+            device_auth = self.cred_store.load_device_auth()
+            if device_auth:
+                logger.info("定时任务：使用 Device Auth 模式（无浏览器）")
+                await self._on_progress_callback("🔑 使用 Device Auth 模式领取...", "active")
+                result = await self._execute_with_device_auth(device_auth)
+            else:
+                # 降级到账号密码 + Playwright
+                cred = self.cred_store.load()
+                if not cred:
+                    logger.warning("定时任务触发，但未配置任何凭证，跳过")
+                    return
+                username = cred.username
+                password = cred.password
+                try:
+                    logger.info("定时任务：使用账号密码模式（Playwright）: 用户 %s", _mask(username))
+                    result = await self._execute(username, password)
+                finally:
+                    cred.clear()
 
-    async def _execute(self, username: str, password: str, verification_code: Optional[str] = None) -> ClaimResult:
-        """实际执行领取流程"""
-        logger.info("执行领取任务，用户: %s", _mask(username))
+            self._last_result = result
+            self.store.add(result)
+
+    async def _execute_with_device_auth(self, credentials: DeviceAuthCredentials) -> ClaimResult:
+        """使用 device auth token 通过 API 领取免费游戏（无需浏览器）"""
+        started = datetime.now().isoformat(timespec="seconds")
+        result = ClaimResult(
+            success=False,
+            username=f"DeviceAuth:{credentials.account_id[:6]}***",
+            started_at=started,
+        )
+
+        try:
+            async with EpicAPIClient() as client:
+                # 1) 获取免费游戏列表（公开 API，无需登录）
+                await self._on_progress_callback("📦 获取本周免费游戏列表...", "active")
+                free_games = await client.fetch_free_games()
+
+                if not free_games:
+                    logger.info("本周暂无免费游戏")
+                    result.success = True
+                    result.error = "本周暂无免费游戏"
+                    result.finished_at = datetime.now().isoformat(timespec="seconds")
+                    await self._on_progress_callback("本周暂无免费游戏", "done")
+                    return result
+
+                await self._on_progress_callback(f"发现 {len(free_games)} 款免费游戏", "done")
+                result.games = [
+                    FreeGame(title=g.title, url=g.url, offer_id=g.offer_id)
+                    for g in free_games
+                ]
+
+                # 2) 逐个领取
+                for i, game in enumerate(result.games, 1):
+                    await self._on_progress_callback(
+                        f"🎯 领取 [{i}/{len(result.games)}]: {game.title}", "active"
+                    )
+                    logger.info("领取游戏: %s (offer_id=%s)", game.title, game.offer_id)
+                    status, message = await client.claim_game(credentials, game)
+
+                    # 更新 game 状态
+                    for fg in free_games:
+                        if fg.offer_id == game.offer_id:
+                            fg.status = status
+                            fg.message = message
+                            break
+
+                    status_icon = "✅" if status in ("claimed", "already_claimed") else "❌"
+                    await self._on_progress_callback(
+                        f"{status_icon} {game.title}: {message}", "done"
+                    )
+
+                # 同步游戏状态到 result
+                result.games = [
+                    FreeGame(title=g.title, url=g.url, offer_id=g.offer_id,
+                             status=g.status, message=g.message)
+                    for g in free_games
+                ]
+
+                result.success = all(
+                    g.status in ("claimed", "already_claimed")
+                    for g in result.games
+                )
+
+        except Exception as e:
+            logger.exception("Device Auth 领取流程异常")
+            result.error = f"执行异常: {type(e).__name__}: {e}"
+            await self._on_progress_callback(f"异常: {e}", "done")
+
+        result.finished_at = datetime.now().isoformat(timespec="seconds")
+        return result
+
+    async def _on_progress_callback(self, step: str, status: str):
+        """统一进度回调入口"""
+        if self._on_progress:
+            try:
+                coro = self._on_progress(step, status)
+                if asyncio.iscoroutine(coro):
+                    await coro
+            except Exception as e:
+                logger.warning("进度回调失败: %s", e)
+
+    async def _execute(self, username: str, password: str,
+                         verification_code: Optional[str] = None) -> ClaimResult:
+        """实际执行领取流程（Playwright 模式）"""
+        logger.info("执行领取任务（Playwright 模式），用户: %s", _mask(username))
         started = datetime.now().isoformat(timespec="seconds")
         result = ClaimResult(
             success=False,
@@ -147,7 +244,6 @@ class ClaimScheduler:
                 finished_at=datetime.now().isoformat(timespec="seconds"),
             )
         finally:
-            # 防御性清空
             password = None  # noqa: F841
 
 

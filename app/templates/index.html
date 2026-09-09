@@ -74,6 +74,17 @@
                 <button type="button" id="delete-device-auth-btn" class="btn-danger" hidden>🗑 撤销授权</button>
             </div>
 
+            <!-- 调试区域 -->
+            <details style="margin-top:16px;">
+                <summary style="cursor:pointer; color:#94a3b8; font-size:13px;">🛠 调试选项（检查 API 是否工作）</summary>
+                <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+                    <button type="button" id="test-free-games-btn" class="btn-secondary">测试免费游戏 API</button>
+                    <button type="button" id="test-device-code-btn" class="btn-secondary">测试申请 device code</button>
+                    <button type="button" id="test-claim-btn" class="btn-secondary">测试领取流程</button>
+                </div>
+                <pre id="device-auth-debug-output" style="margin-top:12px; padding:12px; background:rgba(0,0,0,0.3); border-radius:6px; font-size:12px; max-height:300px; overflow:auto; white-space:pre-wrap; word-break:break-all;"></pre>
+            </details>
+
             <!-- 设备码授权进行中 -->
             <div id="device-auth-flow" hidden>
                 <div class="device-code-box">
