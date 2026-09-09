@@ -61,23 +61,39 @@ async def wait_for_manual_captcha_solve(page: Page, timeout_seconds: int = 120) 
     """等待用户通过 VNC 手动解决 hCaptcha
 
     当 ENABLE_VNC=true 时启用。期间每 5 秒检查 hCaptcha 是否消失。
+    hCaptcha 消失后还需等待一段稳定期（3秒），确保 Epic 服务端完成验证。
     返回 True 表示 hCaptcha 已被解决。
     """
     interval = 5
     max_checks = timeout_seconds // interval
+    captcha_disappeared_time = None  # 记录 hCaptcha 消失的时间
+
     for wait_idx in range(max_checks):
         await asyncio.sleep(interval)
-        # 检查 hCaptcha 是否被解决
+
+        # 检查 hCaptcha 是否消失
         still_captcha = await page.evaluate("""
         () => !!document.querySelector('iframe[src*="hcaptcha"]')
         """)
+
         # 检查是否已离开登录页（成功）
         if "id.epicgames.com" not in page.url:
             logger.info("VNC 手动验证后页面已跳转")
             return True
+
         if not still_captcha:
-            logger.info("用户手动解决了 hCaptcha")
-            return True
+            # hCaptcha 消失了，但需要等待稳定期，防止 Epic 还在处理验证
+            if captcha_disappeared_time is None:
+                captcha_disappeared_time = asyncio.get_event_loop().time()
+                logger.info("hCaptcha 已消失，等待稳定期（Epic 服务端验证）...")
+            else:
+                elapsed = asyncio.get_event_loop().time() - captcha_disappeared_time
+                if elapsed >= 3:  # 等 3 秒稳定期
+                    logger.info("hCaptcha 验证稳定期完成，可继续操作")
+                    return True
+        else:
+            captcha_disappeared_time = None  # 重置
+
         if wait_idx % 6 == 0:  # 每30秒记录一次
             logger.info("VNC 等待用户解决 hCaptcha... (%d/%d 秒)",
                         wait_idx * interval, timeout_seconds)

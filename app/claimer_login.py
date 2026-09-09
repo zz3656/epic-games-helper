@@ -388,12 +388,16 @@ class LoginHandler:
                     await self.parent._save_screenshot(page, "login_captcha_waiting")
                     solved = await self._wait_for_manual_captcha_solve(page, timeout_seconds=120)
                     if solved:
-                        # 验证完成，尝试重新提交登录
+                        # VNC 手动验证 hCaptcha 后，等待足够长的时间让 Epic 服务端完成验证
+                        # hCaptcha 验证通过后需要等待 30 秒才能重新提交登录表单
+                        logger.info("hCaptcha 验证完成，等待 30 秒让服务端处理后再重新提交...")
+                        await asyncio.sleep(30)
+                        # 重新提交登录表单
                         logger.info("重新提交登录表单")
                         await self.parent._click_first_available(
                             target, self.SUBMIT_BUTTON_SELECTORS
                         )
-                        await asyncio.sleep(2)
+                        await asyncio.sleep(3)
                         continue
 
                 # 自动解决失败，提示用户手动处理
