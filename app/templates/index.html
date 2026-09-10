@@ -4,134 +4,176 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Epic Games 免费游戏助手</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/style.css?v=2">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🎮 Epic Games 免费游戏助手</h1>
-            <p class="subtitle">设备码授权 · 零浏览器 · 零验证码</p>
-        </header>
 
-        <!-- 状态横幅 -->
-        <div id="status-banner" class="banner info" hidden></div>
+<!-- ===== Epic 风格顶部导航 ===== -->
+<nav class="epic-nav">
+    <div class="epic-nav-inner">
+        <div class="epic-nav-logo">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M5 5 L19 5 L19 8 L12 13 L5 8 Z"/>
+                <path d="M5 12 L12 17 L19 12 L19 19 L5 19 Z"/>
+            </svg>
+            EPIC HELPER
+            <span class="epic-nav-version">v3.0</span>
+        </div>
+        <div class="epic-nav-spacer"></div>
+        <div class="epic-nav-status" id="nav-status">
+            <span class="nav-status-dot" id="nav-status-dot"></span>
+            <span id="nav-status-text">未授权</span>
+        </div>
+    </div>
+</nav>
 
-        <!-- ===== 单一认证区：设备码登录 ===== -->
-        <section class="card highlight-top">
-            <h2>🎯 Epic 设备码登录 <span class="badge-recommended">推荐</span></h2>
-            <p class="tip">
-                ⚡ <strong>一次授权，永久免登录。</strong>用户在任意浏览器（手机/电脑）完成一次 Epic 授权，
-                之后每周免费游戏追踪 + 一键领取都使用永不过期的 device auth token。
+<div class="epic-container">
+
+    <!-- ===== Hero 横幅（Epic 风格）===== -->
+    <div class="epic-hero">
+        <div class="epic-hero-content">
+            <span class="epic-hero-kicker">FREE GAMES TRACKER</span>
+            <h1>每周免费游戏，<br>自动追踪 + 一键领取</h1>
+            <p>设备码授权一次，永久免登录。每周五 0:05 自动检查本周免费游戏，通过 webhook 推送通知，永不遗漏。</p>
+        </div>
+    </div>
+
+    <!-- ===== 设备码授权区 ===== -->
+    <section class="epic-section">
+        <div class="epic-section-header">
+            <h2 class="epic-section-title">
+                <span>🔑 设备码授权</span>
+                <span class="epic-card-tag">领取游戏</span>
+            </h2>
+        </div>
+
+        <div class="epic-card">
+            <div class="epic-card-header">
+                <h2>授权状态</h2>
+                <span class="epic-card-tag" id="auth-status-tag">未授权</span>
+            </div>
+
+            <p class="epic-hint">
+                <strong>一次授权，永久免登录。</strong>用户在任意浏览器（手机/电脑）完成一次 Epic 授权，
+                之后每周免费游戏追踪 + 领取链接都使用永不过期的 device auth token。
             </p>
-            <p class="hint">
-                ✨ <strong>作用：</strong>追踪本周免费游戏 · 关联 Epic 库标记已拥有 · 为每个游戏生成一键领取链接。
-                <br>
-                💡 <strong>优势：</strong>不需保存账号密码 · 不需 Playwright/Chromium 依赖
-                · 不会触发 hCaptcha · 容器体积从 1GB 降到 ~150MB
-            </p>
 
-            <div id="device-auth-status" class="cred-status">
-                <span class="status-dot"></span>
-                <span id="device-auth-status-text">加载中…</span>
+            <div class="epic-status empty" id="device-auth-status">
+                <span class="epic-status-dot"></span>
+                <span><span class="epic-status-label">未授权</span> · 请先完成设备码授权</span>
             </div>
 
             <div class="btn-row">
-                <button type="button" id="start-device-auth-btn" class="btn-primary">
-                    <span class="btn-text">🔑 Epic 设备码授权</span>
+                <button type="button" id="start-device-auth-btn" class="btn-epic btn-epic-primary">
+                    <span class="btn-text">开始设备码授权</span>
                     <span class="btn-spinner" hidden>授权中…</span>
                 </button>
-                <button type="button" id="delete-device-auth-btn" class="btn-danger" hidden>🗑 撤销授权</button>
+                <button type="button" id="delete-device-auth-btn" class="btn-epic btn-epic-danger" hidden>撤销授权</button>
             </div>
 
-            <!-- 设备码授权进行中 -->
-            <div id="device-auth-flow" hidden>
-                <div class="device-code-box">
-                    <div class="device-code-label">请在浏览器中输入此代码：</div>
-                    <div class="device-code-value" id="device-code-value">------</div>
-                    <div class="device-code-hint">⏱ 代码 10 分钟内有效</div>
-                </div>
+            <div id="device-auth-result" class="mt-2" hidden></div>
+        </div>
 
-                <div class="verification-uri-box">
-                    <div class="verification-uri-label">点击下方按钮在浏览器中打开 Epic 授权页面：</div>
-                    <a id="verification-uri-link" href="#" target="_blank" class="btn-primary btn-large">
-                        🌐 打开 Epic 授权页面
-                    </a>
-                    <div class="verification-uri-tip">打开后使用你的 Epic 账号登录并授权设备</div>
-                </div>
-
-                <div class="device-auth-status-box">
-                    <div class="polling-spinner">⏳</div>
-                    <div id="device-auth-poll-msg">等待你在浏览器完成授权...</div>
-                </div>
-
-                <button type="button" id="cancel-device-auth-btn" class="btn-secondary">取消授权</button>
+        <!-- 设备码授权进行中 -->
+        <div class="epic-card epic-card-highlight" id="device-auth-flow" hidden>
+            <div class="epic-card-header">
+                <h2>在浏览器中完成授权</h2>
             </div>
 
-            <!-- 立即领取（设备码已授权时显示） -->
-            <div id="manual-claim-section" hidden>
-                <h3 style="margin-top:20px;">🎯 立即领取</h3>
-                <p class="hint">基于已保存的 device auth token，立即调用 Epic API 领取本周免费游戏（无需浏览器）。</p>
-                <button type="button" id="claim-now-btn" class="btn-primary" style="margin-top:10px;">
-                    <span class="btn-text">🚀 立即领取</span>
-                    <span class="btn-spinner" hidden>领取中…</span>
-                </button>
-                <div id="manual-claim-result" class="result" hidden></div>
+            <div class="device-code-box">
+                <div class="device-code-label">输入此代码</div>
+                <div class="device-code-value" id="device-code-value">------</div>
+                <div class="device-code-hint">⏱ 代码 10 分钟内有效</div>
             </div>
 
-            <!-- 本账号的游戏库（设备码已授权时显示） -->
-            <div id="account-games-section" hidden>
-                <h3 style="margin-top:20px;">👤 本账号的游戏库</h3>
-                <p class="hint" id="account-games-hint">加载中…</p>
-                <div id="account-games-grid" class="game-grid"></div>
+            <div class="verification-uri-box">
+                <div class="verification-uri-label">点击下方按钮打开 Epic 授权页面：</div>
+                <a id="verification-uri-link" href="#" target="_blank" class="btn-epic btn-epic-primary btn-large">
+                    🌐 打开 Epic 授权页面
+                </a>
+                <div class="verification-uri-tip">打开后使用你的 Epic 账号登录并授权设备</div>
             </div>
 
-            <!-- 自动领取开关（设备码已授权时显示） -->
-            <div id="auto-claim-section" hidden>
-                <h3 style="margin-top:20px;">⏰ 每周自动领取</h3>
-                <p>每周 <strong>{{ schedule_info.day }}</strong>（北京时间）
-                    <strong>{{ "%02d"|format(schedule_info.hour) }}:{{ "%02d"|format(schedule_info.minute) }}</strong>
-                    自动检查（<code>{{ schedule_info.timezone }}</code>）
-                </p>
-                <div class="switch-row">
-                    <span>自动领取开关：</span>
-                    <label class="switch">
-                        <input type="checkbox" id="auto-switch">
-                        <span class="slider"></span>
-                    </label>
-                    <span id="auto-status-text" class="auto-status"></span>
-                </div>
+            <div class="device-auth-status-box" id="device-auth-status-box">
+                <span class="polling-spinner">⏳</span>
+                <span id="device-auth-poll-msg">等待你在浏览器完成授权…</span>
             </div>
 
-            <div id="device-auth-result" class="result" hidden></div>
+            <button type="button" id="cancel-device-auth-btn" class="btn-epic btn-epic-ghost btn-epic-block">
+                取消授权
+            </button>
+        </div>
+    </section>
 
-            <!-- 调试区域 -->
-            <details style="margin-top:16px;">
-                <summary style="cursor:pointer; color:#94a3b8; font-size:13px;">🛠 调试选项（检查 API 是否工作）</summary>
-                <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
-                    <button type="button" id="test-free-games-btn" class="btn-secondary">测试免费游戏 API</button>
-                    <button type="button" id="test-free-games-raw-btn" class="btn-secondary">查看原始数据</button>
-                    <button type="button" id="test-device-code-btn" class="btn-secondary">测试申请 device code</button>
-                    <button type="button" id="test-claim-btn" class="btn-secondary">测试领取流程</button>
-                </div>
-                <pre id="device-auth-debug-output" style="margin-top:12px; padding:12px; background:rgba(0,0,0,0.3); border-radius:6px; font-size:12px; max-height:300px; overflow:auto; white-space:pre-wrap; word-break:break-all;"></pre>
-            </details>
-        </section>
+    <!-- ===== 本周免费游戏 ===== -->
+    <section class="epic-section" id="weekly-free-section" hidden>
+        <div class="epic-section-header">
+            <h2 class="epic-section-title">🎮 本周免费游戏</h2>
+            <span class="epic-section-meta" id="weekly-free-hint">加载中…</span>
+        </div>
+        <div id="weekly-free-grid" class="game-grid"></div>
+    </section>
 
-        <!-- ===== 历史 ===== -->
-        <section class="card">
-            <h2>📜 历史记录</h2>
-            <button id="refresh-history" class="btn-secondary">🔄 刷新</button>
-            <div id="history-list" class="history-list">
-                <p class="hint">暂无记录</p>
+    <!-- ===== 每周赠送记录 ===== -->
+    <section class="epic-section" id="weekly-history-section" hidden>
+        <div class="epic-section-header">
+            <h2 class="epic-section-title">📜 每周赠送记录</h2>
+            <span class="epic-section-meta">自动按周分组</span>
+        </div>
+        <div id="weekly-history-grid"></div>
+    </section>
+
+    <!-- ===== 定时任务 ===== -->
+    <section class="epic-section" id="auto-claim-section" hidden>
+        <div class="epic-section-header">
+            <h2 class="epic-section-title">⏰ 定时检查</h2>
+            <span class="epic-section-meta">北京时间每周五 0:05</span>
+        </div>
+
+        <div class="epic-card">
+            <p class="epic-hint">
+                每周五 0:05 自动拉取本周免费游戏，与上一次对比，有变化则推送通知（需配置 webhook）。
+            </p>
+            <div class="epic-status configured">
+                <span class="epic-status-dot"></span>
+                <span class="epic-status-label">定时任务已启动</span>
             </div>
-        </section>
+            <div class="mt-1">
+                <span class="text-muted" style="font-size:12px;" id="auto-claim-next-run">下次运行：加载中…</span>
+            </div>
+            <div class="mt-1">
+                <span class="text-muted" style="font-size:12px;" id="auto-claim-notify">推送状态：未配置</span>
+            </div>
+        </div>
+    </section>
 
-        <footer>
-            <p>🔒 设备码授权：token 永不过期（除非你撤销）</p>
-            <p>📦 镜像仅 ~150MB（无 Chromium/Playwright）</p>
-        </footer>
-    </div>
+    <!-- ===== 调试区 ===== -->
+    <section class="epic-section">
+        <details class="debug-section">
+            <summary>🛠 调试选项</summary>
+            <div class="debug-actions">
+                <button type="button" id="test-free-games-btn" class="btn-epic btn-epic-ghost btn-epic-sm">测试免费游戏 API</button>
+                <button type="button" id="test-free-games-raw-btn" class="btn-epic btn-epic-ghost btn-epic-sm">查看原始数据</button>
+                <button type="button" id="test-device-code-btn" class="btn-epic btn-epic-ghost btn-epic-sm">测试申请 device code</button>
+                <button type="button" id="test-claim-btn" class="btn-epic btn-epic-ghost btn-epic-sm">测试领取流程</button>
+                <button type="button" id="refresh-weekly-btn" class="btn-epic btn-epic-ghost btn-epic-sm">刷新本周游戏</button>
+                <button type="button" id="test-scheduler-btn" class="btn-epic btn-epic-ghost btn-epic-sm">手动触发定时任务</button>
+                <button type="button" id="test-notify-btn" class="btn-epic btn-epic-ghost btn-epic-sm">测试 webhook 推送</button>
+            </div>
+            <pre id="device-auth-debug-output" class="debug-output"></pre>
+        </details>
+    </section>
 
-    <script src="/static/device_auth.js"></script>
+    <!-- ===== Footer ===== -->
+    <footer class="epic-footer">
+        <p>🔒 设备码授权：token 永不过期（除非你撤销）</p>
+        <p>📦 镜像仅 ~150MB · 纯 HTTP API · 无浏览器依赖</p>
+        <p>基于 Epic Games 官方 API · 仅供参考</p>
+    </footer>
+
+</div>
+
+<script src="/static/device_auth.js?v=8"></script>
+<script src="/static/free_games.js?v=2"></script>
 </body>
 </html>

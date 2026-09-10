@@ -27,9 +27,11 @@ class Config:
 
 def load_config() -> Config:
     return Config(
-        schedule_day=os.getenv("SCHEDULE_DAY", "thu").lower(),
-        schedule_hour=int(os.getenv("SCHEDULE_HOUR", "17")),
-        schedule_minute=int(os.getenv("SCHEDULE_MINUTE", "0")),
+        # Epic Games 免费游戏在 北京时间每周五 0:00 更新
+        # 设为周五 0:05 避开高峰期
+        schedule_day=os.getenv("SCHEDULE_DAY", "fri").lower(),
+        schedule_hour=int(os.getenv("SCHEDULE_HOUR", "0")),
+        schedule_minute=int(os.getenv("SCHEDULE_MINUTE", "5")),
         timezone=os.getenv("TZ", "Asia/Shanghai"),
         headless=os.getenv("HEADLESS", "true").lower() == "true",
         log_level=os.getenv("LOG_LEVEL", "INFO").upper(),

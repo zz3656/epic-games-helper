@@ -1,27 +1,44 @@
 """
-定时调度：每周触发自动领取（纯 API 模式）
+定时调度：每周五 0:05（北京时间）检查 Epic 本周免费游戏 + 推送通知
 
-使用 Device Auth token + Epic HTTP API，完全无浏览器、无 hCaptcha。
+工作流程：
+1. 拉取 Epic 本周免费游戏
+2. 拉取下周预告
+3. 对比 history.json 中上一周记录
+4. 如果本周游戏有变化（新游戏 / 替换），触发 webhook 推送
+5. 把本周免费游戏写入 history.json（让"每周赠送记录"区域可见）
+
+Webhook 推送可选：
+- Bark（iOS）
+- Server 酱（微信）
+- Telegram Bot
+- 通用 Webhook
+
+不配置 webhook 时，定时任务仍然运行，只是不会推送通知。
 """
 import asyncio
+import hashlib
+import json
 import logging
 from datetime import datetime
-from typing import Any, Callable, Optional
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from app.config import Config, DAY_MAP
 from app.credential_store import CredentialStore
-from app.epic_api import EpicAPIClient, DeviceAuthCredentials, FreeGame
-from app.result import ClaimResult
+from app.epic_api import EpicAPIClient, DeviceAuthCredentials
+from app.notifier import Notifier
+from app.result import ClaimResult, FreeGame
 from app.storage import ResultStore
 
 logger = logging.getLogger(__name__)
 
 
 class ClaimScheduler:
-    """管理定时任务与并发锁"""
+    """管理定时任务（周五 0:05 检查 + webhook 推送）"""
 
     def __init__(
         self,
@@ -33,14 +50,17 @@ class ClaimScheduler:
         self.config = config
         self.store = store
         self.cred_store = credential_store
-        self.auto_claim_enabled = auto_claim_enabled
+        self.auto_claim_enabled = auto_claim_enabled  # 已废弃，保留仅为兼容
         self.scheduler = AsyncIOScheduler(timezone=config.timezone)
         self._lock = asyncio.Lock()
-        self._last_result: Optional[Any] = None
-        self._on_progress: Optional[Callable] = None
+        self.notifier = Notifier()
+        # 上次检查的 fingerprint（用于检测游戏是否有变化）
+        self._last_fingerprint: Optional[str] = None
+        # 上一周的 fingerprint（从 history.json 加载）
+        self._previous_fingerprint: Optional[str] = None
 
     def start(self):
-        day = DAY_MAP.get(self.config.schedule_day, "thu")
+        day = DAY_MAP.get(self.config.schedule_day, "fri")
         trigger = CronTrigger(
             day_of_week=day,
             hour=self.config.schedule_hour,
@@ -50,139 +70,255 @@ class ClaimScheduler:
         self.scheduler.add_job(
             self._run_scheduled_job,
             trigger=trigger,
-            id="epic_weekly_claim",
-            name="Epic 每周自动领取",
+            id="epic_weekly_check",
+            name="Epic 每周免费游戏检查 + 通知",
             replace_existing=True,
             max_instances=1,
             coalesce=True,
         )
         self.scheduler.start()
+
+        # 启动时立即加载上一次 fingerprint（避免首次运行误报"新游戏"）
+        self._previous_fingerprint = self._load_previous_fingerprint()
+        next_run = self.scheduler.get_job("epic_weekly_check").next_run_time
         logger.info(
-            "定时任务已启动：每周 %s %02d:%02d (%s) | 自动领取: %s",
+            "定时任务已启动：每周 %s %02d:%02d (%s) | 下次运行：%s | 通知：%s",
             day, self.config.schedule_hour, self.config.schedule_minute,
             self.config.timezone,
-            "已启用" if self.auto_claim_enabled else "未启用",
+            next_run.strftime("%Y-%m-%d %H:%M:%S") if next_run else "未知",
+            "已启用" if self.notifier.enabled else "未配置 webhook",
         )
 
     def enable_auto_claim(self, enabled: bool):
-        """开启/关闭自动领取"""
+        """已废弃：保留仅为兼容。Epic 无法通过纯 API 自动领取。"""
         self.auto_claim_enabled = enabled
-        logger.info("自动领取已 %s", "开启" if enabled else "关闭")
 
     def shutdown(self):
         if self.scheduler.running:
             self.scheduler.shutdown(wait=False)
             logger.info("调度器已关闭")
 
+    def get_next_run_time(self) -> Optional[str]:
+        """获取下次运行时间（用于 API 暴露给前端）"""
+        job = self.scheduler.get_job("epic_weekly_check")
+        if job and job.next_run_time:
+            return job.next_run_time.strftime("%Y-%m-%d %H:%M:%S")
+        return None
+
+    # ============================================
+    # 定时任务主流程
+    # ============================================
+
     async def _run_scheduled_job(self):
-        """定时任务入口"""
-        if not self.auto_claim_enabled:
-            logger.info("定时任务触发，但自动领取未启用，跳过")
-            return
-
-        device_auth = self.cred_store.load_device_auth()
-        if not device_auth:
-            logger.warning("定时任务触发，但未配置 device auth，跳过")
-            return
-
+        """周五 0:05 触发：拉取本周免费游戏 + 检测变化 + 推送 + 写入历史"""
         if self._lock.locked():
             logger.warning("定时任务：已有任务执行中，跳过本次")
             return
 
         async with self._lock:
-            logger.info("定时任务：用户 DeviceAuth:%s***",
-                        _mask(device_auth.account_id))
-            result = await self._execute_with_device_auth(device_auth)
-            self._last_result = result
-            self.store.add(result)
+            logger.info("=" * 60)
+            logger.info("⏰ 定时任务开始：检查本周 Epic 免费游戏")
+            logger.info("=" * 60)
 
-    async def _execute_with_device_auth(
-        self, credentials: DeviceAuthCredentials,
-    ) -> ClaimResult:
-        """使用 device auth token 通过 API 领取免费游戏（无需浏览器）"""
-        started = datetime.now().isoformat(timespec="seconds")
-        result = ClaimResult(
-            success=False,
-            username=f"DeviceAuth:{credentials.account_id[:6]}***",
-            started_at=started,
-        )
-
-        try:
-            async with EpicAPIClient() as client:
-                # 1) 获取免费游戏列表
-                await self._on_progress_callback(
-                    "📦 获取本周免费游戏列表...", "active"
-                )
-                free_games = await client.fetch_free_games()
-
-                if not free_games:
-                    logger.info("本周暂无免费游戏")
-                    result.success = True
-                    result.error = "本周暂无免费游戏"
-                    result.finished_at = datetime.now().isoformat(timespec="seconds")
-                    await self._on_progress_callback(
-                        "本周暂无免费游戏", "done"
-                    )
-                    return result
-
-                await self._on_progress_callback(
-                    f"发现 {len(free_games)} 款免费游戏", "done"
-                )
-                result.games = [
-                    FreeGame(title=g.title, url=g.url, offer_id=g.offer_id)
-                    for g in free_games
-                ]
-
-                # 2) 逐个领取
-                for i, game in enumerate(result.games, 1):
-                    await self._on_progress_callback(
-                        f"🎯 领取 [{i}/{len(result.games)}]: {game.title}",
-                        "active",
-                    )
-                    logger.info("领取游戏: %s (offer_id=%s)", game.title, game.offer_id)
-                    status, message = await client.claim_game(credentials, game)
-
-                    # 更新游戏状态
-                    for fg in free_games:
-                        if fg.offer_id == game.offer_id:
-                            fg.status = status
-                            fg.message = message
-                            break
-
-                    status_icon = "✅" if status in ("claimed", "already_claimed") else "👉" if status == "needs_manual" else "❌"
-                    await self._on_progress_callback(
-                        f"{status_icon} {game.title}: {message}", "done"
-                    )
-
-                # 同步游戏状态到 result
-                result.games = [
-                    FreeGame(title=g.title, url=g.url, offer_id=g.offer_id,
-                             status=g.status, message=g.message)
-                    for g in free_games
-                ]
-
-                result.success = all(
-                    g.status in ("claimed", "already_claimed", "needs_manual")
-                    for g in result.games
-                )
-
-        except Exception as e:
-            logger.exception("Device Auth 领取流程异常")
-            result.error = f"执行异常: {type(e).__name__}: {e}"
-            await self._on_progress_callback(f"异常: {e}", "done")
-
-        result.finished_at = datetime.now().isoformat(timespec="seconds")
-        return result
-
-    async def _on_progress_callback(self, step: str, status: str):
-        """统一进度回调入口"""
-        if self._on_progress:
             try:
-                coro = self._on_progress(step, status)
-                if asyncio.iscoroutine(coro):
-                    await coro
+                async with EpicAPIClient() as client:
+                    # 1. 拉取本周免费 + 下周预告
+                    games, upcoming = await client.fetch_free_games()
+
+                    logger.info(
+                        "本周免费：%d 款 | 下周预告：%d 款",
+                        len(games), len(upcoming),
+                    )
+
+                    if not games:
+                        logger.warning("本周暂无免费游戏（可能 Epic API 临时故障）")
+                        return
+
+                    # 2. 计算 fingerprint（用于检测变化）
+                    current_fingerprint = self._compute_fingerprint(games)
+
+                    if current_fingerprint == self._previous_fingerprint:
+                        logger.info(
+                            "本周游戏与上次记录一致，无需推送通知 "
+                            "(games=%s)",
+                            [g.title for g in games],
+                        )
+                        # 仍然写入历史（保持最新的 end_date 等信息）
+                        self._record_to_history(games, upcoming, notified=False)
+                        return
+
+                    logger.info(
+                        "🆕 检测到新的免费游戏（或游戏列表变化）"
+                    )
+
+                    # 3. 写入历史记录
+                    self._record_to_history(games, upcoming, notified=True)
+
+                    # 4. 推送通知（仅当有 webhook 时）
+                    if self.notifier.enabled:
+                        await self._send_notification(games, upcoming)
+                    else:
+                        logger.info(
+                            "未配置 webhook，跳过推送 "
+                            "（如需推送，请配置 NOTIFY_WEBHOOK_TYPE/URL/TOKEN）"
+                        )
+
+                    # 5. 更新 fingerprint
+                    self._previous_fingerprint = current_fingerprint
+                    self._last_fingerprint = current_fingerprint
+
             except Exception as e:
-                logger.warning("进度回调失败: %s", e)
+                logger.exception("定时任务执行异常: %s", e)
+
+            logger.info("=" * 60)
+            logger.info("⏰ 定时任务结束")
+            logger.info("=" * 60)
+
+    # ============================================
+    # 工具方法
+    # ============================================
+
+    @staticmethod
+    def _compute_fingerprint(games) -> str:
+        """计算本周免费游戏的 fingerprint（按 offer_id_short 排序后哈希）"""
+        # 用 offer_id_short + namespace 作为唯一标识
+        ids = sorted(f"{g.namespace}/{g.offer_id_short}" for g in games if g.offer_id_short)
+        raw = "|".join(ids)
+        return hashlib.md5(raw.encode()).hexdigest()
+
+    def _load_previous_fingerprint(self) -> Optional[str]:
+        """从 history.json 加载上一次的游戏 fingerprint
+
+        查找最新一条"通知已发送"的记录（success=True 且 notified=True）
+        """
+        try:
+            history_file = Path(self.store.file_path)
+            if not history_file.exists():
+                return None
+            with open(history_file, "r", encoding="utf-8") as f:
+                records = json.load(f)
+
+            # 找最新一条 notified=True 的记录
+            for record in reversed(records):
+                if record.get("notified") and record.get("games"):
+                    games = record.get("games", [])
+                    if games:
+                        ids = sorted(g.get("offer_id", "") for g in games if g.get("offer_id"))
+                        if ids:
+                            raw = "|".join(ids)
+                            logger.info("从历史加载上一次 fingerprint：%d 款游戏", len(ids))
+                            return hashlib.md5(raw.encode()).hexdigest()
+            return None
+        except Exception as e:
+            logger.warning("加载历史 fingerprint 失败: %s", e)
+            return None
+
+    def _record_to_history(self, games, upcoming, notified: bool):
+        """把本周免费游戏 + 下周预告写入 history.json"""
+        started_at = datetime.now().isoformat(timespec="seconds")
+        finished_at = started_at
+
+        # 把 FreeGame 转 dict（保留 offer_id 等关键字段）
+        games_data = []
+        for g in games:
+            games_data.append({
+                "title": g.title,
+                "url": g.url,
+                "offer_id": g.offer_id,
+                "namespace": g.namespace,
+                "offer_id_short": g.offer_id_short,
+                "image_url": g.image_url,
+                "end_date": g.end_date,
+                "original_price": g.original_price,
+                "status": "available",  # 标记为可领取
+                "message": "请前往 Epic 商店领取",
+            })
+
+        upcoming_data = []
+        for u in upcoming:
+            upcoming_data.append({
+                "title": u.title,
+                "url": u.url,
+                "offer_id": u.offer_id,
+                "namespace": u.namespace,
+                "offer_id_short": u.offer_id_short,
+                "image_url": u.image_url,
+                "end_date": u.end_date,
+                "original_price": u.original_price,
+                "status": "upcoming",
+                "message": "下周免费",
+            })
+
+        # 直接构造 dict 写入 history.json（不通过 ClaimResult，避免 dataclass 限制）
+        record = {
+            "success": True,
+            "username": "scheduler",
+            "error": None,
+            "started_at": started_at,
+            "finished_at": finished_at,
+            "screenshot_path": None,
+            "notified": notified,  # 标记是否已发送通知（用于下次 fingerprint 比较）
+            "type": "weekly_check",  # 区分于 claim_now / auto_claim
+            "week_id": datetime.now().strftime("%Y-W%V"),  # ISO week
+            "games": games_data,
+            "upcoming_games": upcoming_data,
+        }
+
+        # 用 store.add 但需绕过 dataclass 限制
+        # 直接操作 deque + flush
+        try:
+            with self.store._lock:
+                from collections import deque
+                self.store._records.append(record)
+                # 保留最近 100 条（避免覆盖之前的领取记录）
+                if len(self.store._records) > 100:
+                    # deque 已经 maxlen=50，先临时放大再收缩
+                    while len(self.store._records) > 100:
+                        self.store._records.popleft()
+                self.store._flush()
+            logger.info(
+                "已写入历史：%d 款本周免费 + %d 款下周预告 (week_id=%s, notified=%s)",
+                len(games_data), len(upcoming_data),
+                record["week_id"], notified,
+            )
+        except Exception as e:
+            logger.exception("写入历史失败: %s", e)
+
+    async def _send_notification(self, games, upcoming):
+        """构造推送内容并发送"""
+        # 推送的 games dict 列表（限制字段避免传输过大）
+        push_games = []
+        for g in games:
+            push_games.append({
+                "title": g.title,
+                "url": g.url,
+                "original_price": g.original_price,
+                "end_date": g.end_date,
+            })
+
+        # 标题：🎮 Epic 本周免费游戏
+        title = f"🎮 Epic 本周 {len(games)} 款免费游戏"
+        # 正文
+        lines = [f"📅 本周免费领取（截至 {games[0].end_date[:10] if games[0].end_date else '本周结束'}）"]
+        for g in games:
+            price_part = f" {g.original_price} → 免费" if g.original_price else ""
+            lines.append(f"• {g.title}{price_part}")
+        if upcoming:
+            lines.append("")
+            lines.append(f"📅 下周预告：{', '.join(u.title for u in upcoming)}")
+        body = "\n".join(lines)
+
+        sent = await self.notifier.send(
+            title=title,
+            body=body,
+            games=push_games,
+            level="timeSensitive",
+            icon="🎮",
+        )
+        if sent:
+            logger.info("📲 推送通知已发送")
+        else:
+            logger.warning("📲 推送通知失败")
 
 
 def _mask(u: str) -> str:

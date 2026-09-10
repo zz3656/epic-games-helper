@@ -9,11 +9,11 @@ import logging
 import time
 from typing import Dict, Any
 
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel
 
-from app.epic_api import EpicAPIClient
+from app.epic_api import EpicAPIClient, EPIC_ENTITLEMENTS_URL
 
 logger = logging.getLogger(__name__)
 
@@ -187,7 +187,7 @@ async def claim_now_with_device_auth(req: DeviceAuthClaimRequest):
             _claim_progress[claim_id]["status"] = "active"
 
             async with EpicAPIClient() as client:
-                free_games = await client.fetch_free_games()
+                free_games, _ = await client.fetch_free_games()
 
                 if not free_games:
                     _claim_results[claim_id] = {
@@ -282,13 +282,19 @@ async def test_fetch_free_games():
     from app.epic_api import EpicAPIClient
     try:
         async with EpicAPIClient() as client:
-            games = await client.fetch_free_games()
+            games, upcoming = await client.fetch_free_games()
         return JSONResponse(content={
             "success": True,
             "count": len(games),
+            "upcoming_count": len(upcoming),
             "games": [
                 {"title": g.title, "offer_id": g.offer_id, "url": g.url}
                 for g in games
+            ],
+            "upcoming": [
+                {"title": g.title, "offer_id": g.offer_id, "url": g.url,
+                 "start_date": g.start_date, "end_date": g.end_date}
+                for g in upcoming
             ],
         })
     except Exception as e:
@@ -296,6 +302,56 @@ async def test_fetch_free_games():
             "success": False,
             "error": str(e),
         }, status_code=500)
+
+
+@router.post("/api/scheduler/test-run")
+async def test_scheduler_run():
+    """手动触发定时任务（调试用）
+
+    用于验证周五 0:05 定时任务的完整逻辑：
+    1. 拉取本周免费游戏
+    2. 与上一次的 fingerprint 对比
+    3. 如果有变化，推送 webhook
+    4. 写入 history.json
+
+    如有 device auth 则实际执行；否则仅记录游戏列表。
+    """
+    from app.main import scheduler as _sched
+    if _sched is None:
+        return JSONResponse(content={"success": False, "error": "scheduler 未初始化"}, status_code=500)
+    try:
+        await _sched._run_scheduled_job()
+        return JSONResponse(content={"success": True, "message": "定时任务已手动触发"})
+    except Exception as e:
+        logger.exception("手动触发定时任务失败")
+        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
+
+
+@router.post("/api/scheduler/test-notify")
+async def test_scheduler_notify():
+    """发送测试推送（调试用，验证 webhook 配置是否正确）"""
+    from app.main import scheduler as _sched
+    if _sched is None:
+        return JSONResponse(content={"success": False, "error": "scheduler 未初始化"}, status_code=500)
+    if not _sched.notifier.enabled:
+        return JSONResponse(content={
+            "success": False,
+            "error": "Webhook 未配置。请设置 NOTIFY_WEBHOOK_TYPE/NOTIFY_WEBHOOK_URL/NOTIFY_WEBHOOK_TOKEN 环境变量",
+        }, status_code=400)
+    sent = await _sched.notifier.send(
+        title="🎮 Epic 推送测试",
+        body="这是一条测试推送。如果你收到了这条消息，说明 webhook 配置正确。",
+        games=[{
+            "title": "测试游戏",
+            "url": "https://store.epicgames.com/zh-CN/free-games",
+            "original_price": "¥99.00",
+            "end_date": "2026-12-31",
+        }],
+    )
+    return JSONResponse(content={
+        "success": sent,
+        "message": "推送已发送" if sent else "推送失败（查看后端日志）",
+    })
 
 
 @router.post("/api/device-auth/test/free-games-raw")
@@ -387,7 +443,7 @@ async def test_claim_with_device_auth():
 
     try:
         async with EpicAPIClient() as client:
-            games = await client.fetch_free_games()
+            games, _ = await client.fetch_free_games()
             if not games:
                 return JSONResponse(content={
                     "success": True,
@@ -465,6 +521,34 @@ async def device_auth_account_info():
     })
 
 
+# @router.get("/api/debug/entitlements-raw")
+# async def debug_entitlements_raw():
+#     """调试接口：已禁用（完整游戏库功能已下线，entitlements 仅返回 UE 插件噪声）
+#
+#     历史：曾用于查看用户 entitlements 分布，发现 98% 是 UE 引擎插件（噪声），
+#     完整游戏库需 library-service 权限（OAuth authorization_code flow），
+#     第三方应用无法获取。
+#     """
+#     return JSONResponse(content={
+#         "success": False,
+#         "error": "该调试接口已禁用。完整游戏库功能不可用（参见 README）。",
+#     }, status_code=410)
+
+
+# ============================================
+# Authorization Code Flow 端点
+# ============================================
+# Authorization Code Flow 端点已从当前版本移除
+# ============================================
+# 原因：Epic 内部 OAuth client (launcherAppClient2) 未注册 localhost redirect_uri，
+# 任何 /id/authorize 调用都会返回 errors.com.epicgames.accountportal.client_redirect_domain_mismatch 错误。
+# 完整游戏库查询需要的 library:public:items 权限只能通过 OAuth authorization_code flow 获得，
+# 但第三方应用无法使用该流程。device auth + entitlements API 仅返回 UE 插件噪声（98% 不是游戏）。
+#
+# 如需查看完整游戏库，请前往 https://www.epicgames.com/store/mygames
+# ============================================
+
+
 @router.get("/api/free-games")
 async def get_free_games():
     """获取本周免费游戏列表，包含封面图、描述、是否已拥有、领取链接等信息
@@ -488,12 +572,13 @@ async def get_free_games():
     try:
         async with EpicAPIClient() as client:
             logger.info("Fetching free games (credentials=%s)", "yes" if credentials else "no")
-            games, diagnostics = await client.fetch_free_games_with_status(credentials)
-            logger.info("Got %d free games, diagnostics=%s", len(games), diagnostics)
+            games, upcoming, diagnostics = await client.fetch_free_games_with_status(credentials)
+            logger.info("Got %d free games, %d upcoming, diagnostics=%s",
+                        len(games), len(upcoming), diagnostics)
             return JSONResponse(content={
                 "success": True,
                 "diagnostics": diagnostics,
-                "games": [
+                "free_games": [
                     {
                         "title": g.title,
                         "url": g.url,
@@ -509,9 +594,80 @@ async def get_free_games():
                     }
                     for g in games
                 ],
+                "upcoming_free_games": [
+                    {
+                        "title": g.title,
+                        "url": g.url,
+                        "offer_id": g.offer_id,
+                        "namespace": g.namespace,
+                        "image_url": g.image_url,
+                        "start_date": g.start_date,
+                        "end_date": g.end_date,
+                        "original_price": g.original_price,
+                    }
+                    for g in upcoming
+                ],
             })
     except Exception as e:
         logger.exception("获取免费游戏列表失败")
+        return JSONResponse(content={
+            "success": False,
+            "error": f"{type(e).__name__}: {e}",
+        }, status_code=500)
+
+
+@router.get("/api/account/games")
+async def get_account_games():
+    """获取本账号的相关游戏列表（简化版）：
+    1. 本周免费游戏（含领取链接）
+    2. 下周预告
+
+    注：完整游戏库查询已被禁用（library-service 需要 OAuth 授权，第三方应用不可用）。
+    如需查看完整游戏库，请前往 https://www.epicgames.com/store/mygames
+    """
+    from app.epic_api import EpicAPIClient
+
+    try:
+        async with EpicAPIClient() as client:
+            free_games, upcoming_games, free_diag = await client.fetch_free_games_with_status(None)
+            free_list = [
+                {
+                    "title": g.title,
+                    "url": g.url,
+                    "offer_id": g.offer_id,
+                    "namespace": g.namespace,
+                    "image_url": g.image_url,
+                    "description": g.description,
+                    "checkout_url": g.checkout_url,
+                    "start_date": g.start_date,
+                    "end_date": g.end_date,
+                    "original_price": g.original_price,
+                }
+                for g in free_games
+            ]
+            upcoming_list = [
+                {
+                    "title": g.title,
+                    "url": g.url,
+                    "offer_id": g.offer_id,
+                    "namespace": g.namespace,
+                    "image_url": g.image_url,
+                    "start_date": g.start_date,
+                    "end_date": g.end_date,
+                    "original_price": g.original_price,
+                }
+                for g in upcoming_games
+            ]
+
+            logger.info("Free games: %d, Upcoming: %d", len(free_list), len(upcoming_list))
+            return JSONResponse(content={
+                "success": True,
+                "free_games": free_list,
+                "upcoming_free_games": upcoming_list,
+                "free_games_diagnostic": free_diag,
+            })
+    except Exception as e:
+        logger.exception("获取游戏列表失败")
         return JSONResponse(content={
             "success": False,
             "error": f"{type(e).__name__}: {e}",

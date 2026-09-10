@@ -1,7 +1,7 @@
 """
 加密设备授权（Device Auth）凭证存储
 
-存储内容（仅 Device Auth，不再支持账号密码）：
+存储内容：
 - account_id: Epic 账号 ID
 - device_id: 设备 ID
 - secret: 设备密钥
@@ -11,6 +11,10 @@
 
 加密方式：Fernet (AES-128-CBC + HMAC-SHA256)
 密钥来源：.env 中的 EPIC_MASTER_KEY（首次启动自动生成）
+
+注意：本项目仅支持 Device Auth，不支持账号密码/OAuth authorization_code flow。
+完整游戏库查询需要 OAuth authorization_code flow，但 Epic 内部 OAuth client
+未注册 localhost redirect_uri，所以第三方应用无法实现。
 """
 import json
 import logging
@@ -118,9 +122,10 @@ class CredentialStore:
 
     def status(self) -> dict:
         """查询状态（不含明文）"""
-        configured = self.has_device_auth()
-        info = {"device_auth_configured": configured}
-        if configured:
+        info = {
+            "device_auth_configured": self.has_device_auth(),
+        }
+        if self.has_device_auth():
             try:
                 size = os.path.getsize(self.device_auth_path)
                 info["file_size"] = size

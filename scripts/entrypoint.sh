@@ -23,14 +23,20 @@ if [ ! -f "$ENV_FILE" ] || ! grep -q "^EPIC_MASTER_KEY=" "$ENV_FILE" 2>/dev/null
 EPIC_MASTER_KEY=${MASTER_KEY}
 
 TZ=Asia/Shanghai
-SCHEDULE_DAY=thu
-SCHEDULE_HOUR=17
-SCHEDULE_MINUTE=0
+# Epic Games 免费游戏在北京时间每周五 0:00 更新，默认周五 0:05 检查
+SCHEDULE_DAY=fri
+SCHEDULE_HOUR=0
+SCHEDULE_MINUTE=5
 
 HEADLESS=true
 LOG_LEVEL=INFO
 
 AUTO_CLAIM_ENABLED=true
+
+# Webhook 推送（可选，如需启用请取消下面的注释并填入实际值）
+# NOTIFY_WEBHOOK_TYPE=bark
+# NOTIFY_WEBHOOK_URL=https://api.day.app
+# NOTIFY_WEBHOOK_TOKEN=your_device_key
 EOF
 
     echo "[INFO] .env generated at ${ENV_FILE}"
@@ -47,9 +53,9 @@ export TZ="${TZ:-Asia/Shanghai}"
 export HEADLESS="${HEADLESS:-true}"
 export LOG_LEVEL="${LOG_LEVEL:-INFO}"
 export AUTO_CLAIM_ENABLED="${AUTO_CLAIM_ENABLED:-true}"
-export SCHEDULE_DAY="${SCHEDULE_DAY:-thu}"
-export SCHEDULE_HOUR="${SCHEDULE_HOUR:-17}"
-export SCHEDULE_MINUTE="${SCHEDULE_MINUTE:-0}"
+export SCHEDULE_DAY="${SCHEDULE_DAY:-fri}"
+export SCHEDULE_HOUR="${SCHEDULE_HOUR:-0}"
+export SCHEDULE_MINUTE="${SCHEDULE_MINUTE:-5}"
 
 if [ -n "$EPIC_MASTER_KEY" ]; then
     echo "[INFO] EPIC_MASTER_KEY is set (length: ${#EPIC_MASTER_KEY})"
