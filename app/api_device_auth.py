@@ -618,53 +618,44 @@ async def get_free_games():
 
 @router.get("/api/account/games")
 async def get_account_games():
-    """获取本账号的相关游戏列表（简化版）：
-    1. 本周免费游戏（含领取链接）
-    2. 下周预告
+    """获取本周免费游戏列表 + 下周预告（简化版，无需登录）
 
-    注：完整游戏库查询已被禁用（library-service 需要 OAuth 授权，第三方应用不可用）。
-    如需查看完整游戏库，请前往 https://www.epicgames.com/store/mygames
+    注：完整游戏库查询不可用。如需查看完整库，请前往 https://www.epicgames.com/store/mygames
     """
     from app.epic_api import EpicAPIClient
 
     try:
         async with EpicAPIClient() as client:
-            free_games, upcoming_games, free_diag = await client.fetch_free_games_with_status(None)
-            free_list = [
-                {
-                    "title": g.title,
-                    "url": g.url,
-                    "offer_id": g.offer_id,
-                    "namespace": g.namespace,
-                    "image_url": g.image_url,
-                    "description": g.description,
-                    "checkout_url": g.checkout_url,
-                    "start_date": g.start_date,
-                    "end_date": g.end_date,
-                    "original_price": g.original_price,
-                }
-                for g in free_games
-            ]
-            upcoming_list = [
-                {
-                    "title": g.title,
-                    "url": g.url,
-                    "offer_id": g.offer_id,
-                    "namespace": g.namespace,
-                    "image_url": g.image_url,
-                    "start_date": g.start_date,
-                    "end_date": g.end_date,
-                    "original_price": g.original_price,
-                }
-                for g in upcoming_games
-            ]
-
-            logger.info("Free games: %d, Upcoming: %d", len(free_list), len(upcoming_list))
+            free_games, upcoming_games = await client.fetch_free_games()
             return JSONResponse(content={
                 "success": True,
-                "free_games": free_list,
-                "upcoming_free_games": upcoming_list,
-                "free_games_diagnostic": free_diag,
+                "free_games": [
+                    {
+                        "title": g.title,
+                        "url": g.url,
+                        "offer_id": g.offer_id,
+                        "namespace": g.namespace,
+                        "image_url": g.image_url,
+                        "checkout_url": g.checkout_url,
+                        "start_date": g.start_date,
+                        "end_date": g.end_date,
+                        "original_price": g.original_price,
+                    }
+                    for g in free_games
+                ],
+                "upcoming_free_games": [
+                    {
+                        "title": g.title,
+                        "url": g.url,
+                        "offer_id": g.offer_id,
+                        "namespace": g.namespace,
+                        "image_url": g.image_url,
+                        "start_date": g.start_date,
+                        "end_date": g.end_date,
+                        "original_price": g.original_price,
+                    }
+                    for g in upcoming_games
+                ],
             })
     except Exception as e:
         logger.exception("获取游戏列表失败")

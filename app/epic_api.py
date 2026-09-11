@@ -39,17 +39,6 @@ EPIC_FREE_GAMES = "https://store-site-backend-static.ak.epicgames.com/freeGamesP
 EPIC_PURCHASE_ORDER = "https://www.epicgames.com/store/purchase"
 EPIC_CHECKOUT_ORDER = "https://payment-website-pci.ol.epicgames.com/purchase/confirm-order"
 
-# User entitlements (查询用户已拥有的游戏)
-EPIC_ENTITLEMENTS_HOST = "entitlement-public-service-prod08.ol.epicgames.com"
-EPIC_CATALOG_HOST = "catalog-public-service-prod06.ol.epicgames.com"
-EPIC_ENTITLEMENTS_URL = f"https://{EPIC_ENTITLEMENTS_HOST}/entitlement/api/account/{{account_id}}/entitlements"
-EPIC_CATALOG_BULK_URL = f"https://{EPIC_CATALOG_HOST}/catalog/api/shared/namespace/{{namespace}}/bulk/items"
-
-# User library (另一个查询接口 - 用于匹配 game library)
-# 参考 legendary: library-service.live.use1a.on.epicgames.com
-EPIC_LIBRARY_HOST = "library-service.live.use1a.on.epicgames.com"
-EPIC_LIBRARY_URL = f"https://{EPIC_LIBRARY_HOST}/library/api/public/items"
-
 # 游戏封面图片
 EPIC_IMAGE_BASE = "https://cdn1.epicgames.com/offer"
 
@@ -124,7 +113,6 @@ class FreeGame:
     image_url: str = ""          # 游戏封面 URL
     description: str = ""        # 游戏描述
     namespace: str = ""          # Epic namespace
-    already_owned: bool = False  # 用户是否已拥有该游戏
     checkout_url: str = ""       # 领取链接 (如未领取)
     start_date: str = ""         # 免费开始日期
     end_date: str = ""           # 免费结束日期
@@ -513,342 +501,24 @@ class EpicAPIClient:
         return None
 
     # ============================================
-    # Entitlements 查询（用户已拥有的游戏）
-    # ============================================
-
-    async def fetch_user_entitlements(
-        self, credentials: DeviceAuthCredentials,
-    ) -> set:
-        """查询用户 library 中已拥有的游戏
-
-        使用 library-service API:
-        GET https://library-service.live.use1a.on.epicgames.com/library/api/public/items?includeMetadata=true
-
-        返回的 records 中每个 record 包含:
-        - catalogItemId: catalog item ID
-        - namespace: namespace
-        - appName: 应用名
-
-        我们的 free game 的 offer_id 是 "namespace/catalogItemId" 格式，
-        所以可以拼接 namespace + "/" + catalogItemId 来匹配。
-        """
-        # 刷新 token（如果过期）
-        if credentials.is_expired():
-            try:
-                credentials = await self.refresh_access_token(credentials)
-            except Exception as e:
-                logger.warning("refresh token 失败，无法查询 library: %s", e)
-                return set()  # 快失败，避免反复重试
-
-        owned_offer_ids = set()
-        cursor = None
-
-        try:
-            while True:
-                params = {"includeMetadata": "true"}
-                if cursor:
-                    params["cursor"] = cursor
-
-                resp = await self.client.get(
-                    EPIC_LIBRARY_URL,
-                    params=params,
-                    headers={
-                        "Authorization": f"Bearer {credentials.access_token}",
-                    },
-                )
-
-                if resp.status_code != 200:
-                    logger.warning("library 查询失败: %s - %s", resp.status_code, resp.text[:200])
-                    break
-
-                data = resp.json()
-                records = data.get("records") or []
-
-                for record in records:
-                    namespace = record.get("namespace") or ""
-                    catalog_item_id = record.get("catalogItemId") or ""
-                    if namespace and catalog_item_id:
-                        # 同时存储两种格式，以适配不同的 offer_id 格式
-                        owned_offer_ids.add(f"{namespace}/{catalog_item_id}")
-                        owned_offer_ids.add(catalog_item_id)
-                    elif catalog_item_id:
-                        owned_offer_ids.add(catalog_item_id)
-
-                response_metadata = data.get("responseMetadata") or {}
-                cursor = response_metadata.get("nextCursor")
-                if not cursor:
-                    break
-
-            logger.info("查询到 %d 个用户已拥有游戏（library API）", len(owned_offer_ids))
-            return owned_offer_ids
-        except Exception as e:
-            logger.exception("查询 library 异常")
-            return set()
-
-    def _build_checkout_url(self, game: FreeGame) -> str:
-        """构造领取链接
-
-        策略变更（2026-09）：
-        Epic 的 /purchase?offers=... 页面会在页面加载后调用 cartOffersValidation API，
-        部分账号遇到 EULA/2FA/会话状态问题时会触发“在尝试处理您的请求时发生错误”提示。
-        实际上该提示是 Epic 自己的 UI bug（且页面加载仍然成功），但影响体验。
-
-        新策略：直接跳转到商品详情页（/p/{slug}），Epic 会渲染原生的“获取免费”按钮（“Get”/“添加到库”），
-        这是 Epic 官方唯一稳定可靠的领取入口。
-        好处：
-        1. 避开 cartOffersValidation API 错误
-        2. 使用 Epic 原生按钮，避免第三方跳转被风控
-        3. 如果用户浏览器未登录 Epic，会被 Epic 自己的 SPA 跳到登录页（同样是 Epic 官方流程）
-
-        URL 示例：https://store.epicgames.com/zh-CN/p/luftrausers-51e5e9
-        """
-        # 优先使用 productSlug（在 offerMappings[0].pageSlug 里更准）
-        # 但 FreeGame.url 已经是从 item.urlSlug 构造的商品页，跳过去就能看到 Epic 原生 UI
-        if game.url:
-            return game.url
-        # 回退：手动拼一个商品页 URL
-        return "https://store.epicgames.com/zh-CN/free-games"
-        return login_url
-
-    # ============================================
-    # 获取已拥有的游戏列表（通过 entitlements API）
-    # ============================================
-
-    async def fetch_owned_games(
-        self, credentials: DeviceAuthCredentials,
-    ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
-        """从 entitlements API 获取用户已入库的游戏列表
-
-        Returns:
-            (owned_games, diagnostics)
-            owned_games: list of dicts with catalogItemId, namespace, grantDate
-            diagnostics: info about the fetch
-        """
-        # 刷新 token
-        if credentials.is_expired():
-            try:
-                credentials = await self.refresh_access_token(credentials)
-            except Exception as e:
-                logger.warning("refresh token 失败，无法查询 owned games: %s", e)
-                return [], {"error": str(e)}
-
-        diagnostics = {"success": False, "error": ""}
-
-        try:
-            resp = await self.client.get(
-                EPIC_ENTITLEMENTS_URL.replace("{account_id}", credentials.account_id),
-                headers={
-                    "Authorization": f"Bearer {credentials.access_token}",
-                },
-            )
-
-            if resp.status_code != 200:
-                diagnostics["error"] = f"{resp.status_code}: {resp.text[:200]}"
-                logger.warning("Entitlements 查询失败: %s", diagnostics["error"])
-                return [], diagnostics
-
-            data = resp.json()
-            items = data if isinstance(data, list) else data.get("entitlements", [])
-
-            # 统计 namespace 分布，用于 diagnostics
-            ns_counts = {}
-            for item in items:
-                ns = item.get("namespace", "unknown")
-                ns_counts[ns] = ns_counts.get(ns, 0) + 1
-
-            # 去重，按 grantDate 排序
-            seen = {}
-            for item in items:
-                ns = item.get("namespace", "")
-                cid = item.get("catalogItemId", "")
-                if not cid or not ns:
-                    continue
-                # 跳过 UE 插件（非游戏内容）
-                if ns == "ue":
-                    continue
-                key = f"{ns}/{cid}"
-                if key not in seen:
-                    grant_date = item.get("grantDate", "")
-                    entitlement_name = item.get("entitlementName", "")
-                    seen[key] = {
-                        "namespace": ns,
-                        "catalogItemId": cid,
-                        "grantDate": grant_date,
-                        "entitlementName": entitlement_name,
-                    }
-
-            # 按入库时间排序（最新的在前）
-            owned_games = sorted(seen.values(), key=lambda x: x["grantDate"], reverse=True)
-
-            # 为特定 namespace 设置友好的显示名称（在共享 catalog 查找之前，避免被覆盖）
-            friendly_titles = {
-                "fn/Fortnite_Free": "Fortnite",
-                "fn/Fortnite": "Fortnite",
-            }
-            for game in owned_games:
-                key = f"{game['namespace']}/{game.get('entitlementName', '')}"
-                if key in friendly_titles:
-                    game["title"] = friendly_titles[key]
-                    game["_friendly_title"] = True  # 标记，避免后续 catalog 查找覆盖
-
-            # 通过 catalog shared namespace API 获取游戏名称
-            # 旧游戏可能 catalogItemId 指向元数据（如 ESRB 评级），不能直接用
-            # 正确做法：用 namespace 获取共享物品列表，筛选有 DieselGameBox 封面图的项
-            # shared namespace items 需要 client_credentials token 认证
-            import base64 as _b64
-            catalog_token = None
-            catalog_client = httpx.AsyncClient(
-                timeout=15.0,
-                headers={
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                    "Accept-Language": "zh-CN",
-                },
-            )
-            try:
-                # 先用 client_credentials 获取 catalog token
-                for _cid, _csec, _cname in EPIC_CLIENTS:
-                    _auth = _b64.b64encode(f"{_cid}:{_csec}".encode()).decode()
-                    try:
-                        _resp = await catalog_client.post(
-                            "https://account-public-service-prod.ol.epicgames.com/account/api/oauth/token",
-                            headers={
-                                "Authorization": f"Basic {_auth}",
-                                "Content-Type": "application/x-www-form-urlencoded",
-                            },
-                            data={"grant_type": "client_credentials"},
-                        )
-                        if _resp.status_code == 200:
-                            catalog_token = _resp.json()["access_token"]
-                            logger.info("Catalog token 获取成功 (client=%s)", _cname)
-                            break
-                        else:
-                            logger.debug("Catalog token client=%s failed: %s", _cname, _resp.status_code)
-                    except Exception as _e:
-                        logger.debug("Catalog token client=%s exception: %s", _cname, _e)
-
-                # 按 namespace 分组缓存（同一 namespace 只需请求一次）
-                ns_items_cache: Dict[str, List[Dict]] = {}
-
-                for game in owned_games:
-                    try:
-                        ns = game["namespace"]
-                        ename = game["entitlementName"]
-
-                        # 获取该 namespace 的 shared items 缓存
-                        if ns not in ns_items_cache:
-                            try:
-                                _headers = {"User-Agent": "Mozilla/5.0"}
-                                if catalog_token:
-                                    _headers["Authorization"] = f"Bearer {catalog_token}"
-                                resp2 = await catalog_client.get(
-                                    f"https://{EPIC_CATALOG_HOST}/catalog/api/shared/namespace/{ns}/items",
-                                    headers=_headers,
-                                )
-                                if resp2.status_code == 200:
-                                    ns_data = resp2.json()
-                                    ns_items_cache[ns] = ns_data.get("elements", [])
-                                    logger.debug("Namespace %s: %d items in shared catalog", ns, len(ns_items_cache[ns]))
-                                else:
-                                    logger.debug("Shared catalog %s failed: %s", ns, resp2.status_code)
-                                    ns_items_cache[ns] = []
-                            except Exception as e:
-                                logger.debug("Shared catalog fetch for %s failed: %s", ns, e)
-                                ns_items_cache[ns] = []
-
-                        # 从缓存中查找匹配的物品
-                        items_in_ns = ns_items_cache.get(ns, [])
-                        title = ename  # 默认回退到 entitlementName
-                        image_url = ""
-                        matched_title = None  # None = 未匹配成功
-                        matched_ename = False
-
-                        # 策略 1：用 entitlementName 匹配 item id
-                        for item in items_in_ns:
-                            if item.get("id") == ename:
-                                matched_ename = True
-                                matched_title = item.get("title", title)
-                                # 如果是 Moa* 分级项（ESRB 等），跳过，不采用
-                                if matched_title.startswith("Moa"):
-                                    matched_title = None
-                                    break
-                                # 记录封面图
-                                for img in item.get("keyImages", []):
-                                    if img.get("type") in ("DieselGameBox", "DieselGameBoxTall", "Thumbnail"):
-                                        image_url = img.get("url", "")
-                                        break
-                                break
-
-                        # 策略 2：策略 1 匹配失败或匹配到 Moa 分级项时，找有 DieselGameBox 封面的游戏项
-                        if not matched_ename or matched_title is None:
-                            for item in items_in_ns:
-                                title_candidate = item.get("title", "")
-                                if title_candidate.startswith("Moa"):
-                                    continue
-                                kimgs = item.get("keyImages", [])
-                                has_gamebox = any(
-                                    ki.get("type") in ("DieselGameBox", "DieselGameBoxTall", "Thumbnail")
-                                    for ki in kimgs
-                                )
-                                if has_gamebox and title_candidate:
-                                    matched_title = title_candidate
-                                    for img in kimgs:
-                                        if img.get("type") in ("DieselGameBox", "DieselGameBoxTall", "Thumbnail"):
-                                            image_url = img.get("url", "")
-                                            break
-                                    break
-
-                        # 使用最终结果（跳过有 friendly_title 标记的）
-                        if game.get("_friendly_title"):
-                            # 已有友好名称，跳过 catalog 查找覆盖
-                            pass
-                        elif matched_title is not None:
-                            game["title"] = matched_title
-                            game["image_url"] = image_url
-                        elif title and title != ename:
-                            game["title"] = title
-                            game["image_url"] = image_url
-                        else:
-                            game["title"] = title  # fallback to ename
-                    except Exception as e:
-                        logger.debug("Title lookup for %s/%s failed: %s", ns, game.get("catalogItemId", "")[:10], e)
-                        pass
-            finally:
-                await catalog_client.aclose()
-
-            diagnostics["success"] = True
-            diagnostics["total"] = len(owned_games)
-            diagnostics["ns_counts"] = ns_counts  # namespace 分布，用于调试
-            logger.info("查询到 %d 个已拥有游戏，namespace 分布: %s", len(owned_games), ns_counts)
-            return owned_games, diagnostics
-
-        except Exception as e:
-            diagnostics["error"] = f"{type(e).__name__}: {e}"
-            logger.exception("查询已拥有游戏异常")
-            return [], diagnostics
-
     async def fetch_free_games_with_status(
         self, credentials: Optional[DeviceAuthCredentials] = None,
     ) -> Tuple[List[FreeGame], List[FreeGame], Dict[str, Any]]:
-        """获取本周免费游戏 + 下周预告 + 检查用户是否已拥有 + 生成领取链接
+        """获取本周免费游戏 + 下周预告 + 生成领取链接
 
-        Args:
-            credentials: device auth credentials（如未提供则不检查是否已拥有）
+        注意：检查用户是否已拥有（entitlements API）需要有效的 device auth token。
+        由于 Epic 内部 OAuth client 未注册 localhost redirect_uri，device auth token
+        权限有限，entitlements API 查询结果不可靠，因此不再使用 credentials。
 
         Returns:
             (games, upcoming, diagnostics)
-            - games: 本周免费游戏列表（含 checkout_url）
-            - upcoming: 下周预告列表（0% 折扣）
-            - diagnostics: 诊断信息
         """
         diagnostics: Dict[str, Any] = {
             "free_games_fetch_ok": False,
-            "library_fetch_ok": False,
-            "library_fetch_error": "",
             "games_count": 0,
             "upcoming_count": 0,
         }
 
-        # 1. 获取本周免费游戏 + 下周预告
         games, upcoming = await self.fetch_free_games()
         diagnostics["free_games_fetch_ok"] = True
         diagnostics["games_count"] = len(games)
@@ -857,31 +527,13 @@ class EpicAPIClient:
         if not games:
             return [], upcoming, diagnostics
 
-        # 2. 查询用户已拥有的 entitlements
-        user_entitlements = set()
-        if credentials:
-            try:
-                user_entitlements = await self.fetch_user_entitlements(credentials)
-                diagnostics["library_fetch_ok"] = True
-            except Exception as e:
-                logger.warning("查询 entitlements 失败: %s", e)
-                diagnostics["library_fetch_error"] = f"{type(e).__name__}: {e}"
-        else:
-            diagnostics["library_fetch_ok"] = False
-            diagnostics["library_fetch_error"] = "未提供 credentials"
-
-        # 3. 标记每款本周免费游戏
+        # 生成 checkout_url
         for game in games:
-            offer_id_short = game.offer_id.split("/")[-1] if "/" in game.offer_id else game.offer_id
-            if offer_id_short in user_entitlements or game.offer_id in user_entitlements:
-                game.already_owned = True
-                game.status = "already_claimed"
-                game.message = "已拥有"
             game.checkout_url = self._build_checkout_url(game)
 
-        # 4. 为下周预告生成商店页 URL（不可领取）
+        # 下周预告使用商店页 URL
         for game in upcoming:
-            game.checkout_url = game.url  # 下周只能跳到商店页
+            game.checkout_url = game.url
 
         return games, upcoming, diagnostics
 
