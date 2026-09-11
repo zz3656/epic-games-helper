@@ -238,10 +238,12 @@ function renderHistoryCard(game) {
         ? `<div class="game-dates">
                <span class="free">🆓 ${escapeHtml(formatDates(game.week_started_at, game.end_date))}</span>
            </div>`
-        : "";
+        : game.week_started_at
+            ? `<div class="game-dates"><span class="free">🆓 ${escapeHtml(formatDate(game.week_started_at))}</span></div>`
+            : "";
     const priceHtml = game.original_price
-        ? `<div class="game-price-row"><span class="original">${escapeHtml(game.original_price)}</span><span class="free">免费</span></div>`
-        : `<div class="game-price-row"><span class="free">🆓 免费</span></div>`;
+        ? `<div class="game-price-row"><span class="original">${escapeHtml(game.original_price)}</span> → 免费</div>`
+        : "";
 
     const cover = game.image_url
         ? `<img class="game-cover" src="${escapeHtml(game.image_url)}" alt="${escapeHtml(game.title)}" loading="lazy" onerror="this.outerHTML='<div class=&quot;game-cover-placeholder&quot;>🎮</div>'">`
