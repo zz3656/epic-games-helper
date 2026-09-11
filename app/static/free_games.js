@@ -222,7 +222,7 @@ function renderWeeklyGroups(groups) {
                     <span class="week-group-title">📅 ${escapeHtml(g.label)}</span>
                     <span class="week-group-count">${games.length} 款游戏</span>
                 </div>
-                <div class="history-list">
+                <div class="weekly-history-grid">
                     ${gamesHtml}
                 </div>
             </div>
@@ -230,53 +230,35 @@ function renderWeeklyGroups(groups) {
     }).join("");
 }
 
-// 获取游戏标题首字（中英文兼容）
-function getInitial(title) {
-    if (!title) return "🎮";
-    return title.trim().charAt(0).toUpperCase() || "🎮";
-}
-
-// 渲染历史赠送游戏（水平列表卡片）
+// ============ 渲染历史赠送游戏卡片（竖向网格布局，和免费游戏一致） ============
 // 只展示游戏清单：封面、标题、免费时段、原价，不展示状态
 function renderHistoryCard(game) {
-    const initial = getInitial(game.title);
+    const daysLeft = daysUntilEnd(game.end_date);
+    const datesHtml = game.end_date
+        ? `<div class="game-dates">
+               <span class="free">🆓 ${escapeHtml(formatDates(game.week_started_at, game.end_date))}</span>
+           </div>`
+        : "";
+    const priceHtml = game.original_price
+        ? `<div class="game-price-row"><span class="original">${escapeHtml(game.original_price)}</span><span class="free">免费</span></div>`
+        : `<div class="game-price-row"><span class="free">🆓 免费</span></div>`;
 
-    // 封面：优先用图片，失败/缺失时用首字占位
     const cover = game.image_url
-        ? `<img class="history-cover" src="${escapeHtml(game.image_url)}" alt="${escapeHtml(game.title)}" loading="lazy" onerror="this.outerHTML='<div class="history-cover-placeholder">${escapeHtml(initial)}</div>'">`
-        : `<div class="history-cover-placeholder">${escapeHtml(initial)}</div>`;
+        ? `<img class="game-cover" src="${escapeHtml(game.image_url)}" alt="${escapeHtml(game.title)}" loading="lazy" onerror="this.outerHTML='<div class=&quot;game-cover-placeholder&quot;>🎮</div>'">`
+        : `<div class="game-cover-placeholder">🎮</div>`;
 
-    // 第一行：标题
-    const row1 = `
-        <div class="history-row1">
-            <h3 class="history-title">${escapeHtml(game.title)}</h3>
-        </div>
-    `;
-
-    // 第二行：免费时段 + 原价
-    const row2Parts = [];
-    if (game.end_date) {
-        row2Parts.push(`<span class="meta-item">🆓 ${escapeHtml(formatDates(game.week_started_at, game.end_date))}</span>`);
-    }
-    if (game.original_price) {
-        row2Parts.push(`<span class="meta-item"><span class="original">${escapeHtml(game.original_price)}</span> → 免费</span>`);
-    }
-    const row2 = row2Parts.length > 0 ? `<div class="history-row2">${row2Parts.join("")}</div>` : "";
-
-    // 整个卡片是可点击的链接
-    if (game.url) {
-        return `
-            <a class="history-game-card" href="${escapeHtml(game.url)}" target="_blank" rel="noopener" data-offer-id="${escapeHtml(game.offer_id)}">
-                ${cover}
-                <div class="history-info">${row1}${row2}</div>
-                <span class="history-link-arrow">›</span>
-            </a>
-        `;
-    }
+    // 历史卡片就是纯链接，点击跳到 Epic 商品页
     return `
-        <div class="history-game-card" data-offer-id="${escapeHtml(game.offer_id)}">
+        <div class="game-card" data-offer-id="${escapeHtml(game.offer_id)}">
             ${cover}
-            <div class="history-info">${row1}${row2}</div>
+            <div class="game-info">
+                <h3 class="game-title">${escapeHtml(game.title)}</h3>
+                ${datesHtml}
+                ${priceHtml}
+                <div class="game-actions">
+                    <a class="btn-claim-card" href="${escapeHtml(game.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">前往 Epic</a>
+                </div>
+            </div>
         </div>
     `;
 }
