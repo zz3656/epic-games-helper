@@ -66,7 +66,11 @@ class ResultStore:
 
     @staticmethod
     def _to_safe_dict(result: ClaimResult) -> dict:
-        """显式白名单字段，绝不序列化任何密码相关属性"""
+        """显式白名单字段，绝不序列化任何密码相关属性
+
+        注意：游戏对象的所有展示字段（封面/描述/价格/时间等）都需要保留，
+        否则前端历史记录页面无法正确渲染封面和介绍。
+        """
         return {
             "success": result.success,
             "username": result.username,   # 已被脱敏
@@ -78,6 +82,14 @@ class ResultStore:
                 {
                     "title": g.title,
                     "url": g.url,
+                    "offer_id": g.offer_id,
+                    "offer_id_short": getattr(g, "offer_id_short", ""),
+                    "namespace": getattr(g, "namespace", ""),
+                    "image_url": getattr(g, "image_url", ""),
+                    "description": getattr(g, "description", ""),
+                    "start_date": getattr(g, "start_date", ""),
+                    "end_date": getattr(g, "end_date", ""),
+                    "original_price": getattr(g, "original_price", ""),
                     "status": g.status,
                     "message": g.message,
                 }

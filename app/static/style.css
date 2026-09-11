@@ -583,6 +583,65 @@ code {
     color: var(--epic-text-muted);
 }
 
+/* 文本封面：当 image_url 为空时使用游戏名生成渐变背景 */
+.game-cover-generated {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    padding: 16px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.game-cover-generated::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 20% 80%, rgba(255,255,255,0.18) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(0,0,0,0.25) 0%, transparent 50%);
+    pointer-events: none;
+}
+
+.game-cover-generated .cover-initial {
+    font-size: 64px;
+    font-weight: 900;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    margin-bottom: 10px;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+    opacity: 0.92;
+}
+
+.game-cover-generated .cover-title {
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.3;
+    max-width: 90%;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.45);
+}
+
+.game-cover-generated .cover-tag {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    background: rgba(0, 0, 0, 0.45);
+    padding: 3px 8px;
+    border-radius: var(--epic-radius-sm);
+    z-index: 1;
+}
+
 .game-info {
     padding: 14px;
     display: flex;
@@ -601,6 +660,29 @@ code {
     align-items: center;
     gap: 8px;
     flex-wrap: wrap;
+}
+
+/* 标题固定单行 + 截断，标签始终可见，标题从左侧截断 */
+.game-title-single-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    flex-wrap: nowrap; /* 覆盖 .game-title 的 flex-wrap: wrap */
+}
+
+.game-title-single-line .game-title-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    flex: 1 1 0; /* 占满剩余空间 */
+}
+
+.game-title-single-line .game-status-badge,
+.game-title-single-line .game-platform-badge {
+    flex-shrink: 0; /* 徽章始终不被压缩 */
+    flex-grow: 0;
 }
 
 .game-dates {
@@ -633,6 +715,10 @@ code {
     -webkit-box-orient: vertical;
 }
 
+.game-description-empty {
+    min-height: 18px;
+}
+
 .game-price-row {
     display: flex;
     align-items: center;
@@ -643,12 +729,26 @@ code {
 .game-price-row .original {
     text-decoration: line-through;
     color: var(--epic-text-muted);
+    flex-shrink: 0;
 }
 
 .game-price-row .free {
     color: var(--epic-green);
     font-weight: 700;
     font-size: 15px;
+}
+
+/* 历史卡片当前售价 */
+.game-price-row .history-current-price {
+    color: var(--epic-text-primary);
+    font-weight: 700;
+    font-size: 15px;
+}
+
+/* 历史卡片无价格时的占位 */
+.game-price-row.history-no-price {
+    color: var(--epic-text-muted);
+    font-size: 12px;
 }
 
 .game-actions {
@@ -713,12 +813,174 @@ code {
     border: 1px solid rgba(46, 204, 113, 0.4);
 }
 
-/* ============ 历史赠送游戏（横向排列，一排4个）============ */
+/* 促销折扣角标（封面图上的折扣标签） */
+.promo-discount-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(231, 76, 60, 0.9);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: var(--epic-radius-sm);
+    z-index: 2;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* 促销卡片封面图 relative */
+.promo-card .game-cover {
+    position: relative;
+}
+
+/* 促销价格 - 折后价 */
+.game-price-row .promo-current {
+    color: var(--epic-yellow);
+    font-weight: 700;
+    font-size: 15px;
+}
+
+/* 运行平台角标 */
+.game-platform-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 6px;
+    border-radius: var(--epic-radius-sm);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    flex-shrink: 0;
+}
+
+.game-platform-badge.platform-pc {
+    background: var(--epic-blue-subtle);
+    color: var(--epic-blue);
+    border: 1px solid rgba(0, 120, 242, 0.3);
+}
+
+.game-platform-badge.platform-android {
+    background: rgba(34, 195, 60, 0.1);
+    color: #22C33C;
+    border: 1px solid rgba(34, 195, 60, 0.3);
+}
+
+.game-platform-badge.platform-ios {
+    background: rgba(200, 200, 210, 0.1);
+    color: var(--epic-text-secondary);
+    border: 1px solid rgba(200, 200, 210, 0.3);
+}
+
+/* ============ 历史赠送游戏（统一网格，16 款/页）============ */
 .weekly-history-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 16px;
     margin-top: 16px;
+}
+
+/* ============ 分页控件 ============ */
+.history-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 24px;
+    padding: 14px 16px;
+    background: var(--epic-surface-1);
+    border: 1px solid var(--epic-divider);
+    border-radius: var(--epic-radius-md);
+    flex-wrap: wrap;
+}
+
+.history-pager-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.history-page-size-label {
+    font-size: 12px;
+    color: var(--epic-text-muted);
+    white-space: nowrap;
+}
+
+.history-page-size-select {
+    padding: 6px 10px;
+    background: var(--epic-surface-2);
+    color: var(--epic-text-primary);
+    border: 1px solid var(--epic-border);
+    border-radius: var(--epic-radius-sm);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: var(--epic-font);
+    color-scheme: dark;
+}
+
+.history-page-size-select option {
+    background: var(--epic-surface-2);
+    color: var(--epic-text-primary);
+}
+
+.btn-pager {
+    padding: 6px 14px;
+    background: var(--epic-surface-2);
+    color: var(--epic-text-primary);
+    border: 1px solid var(--epic-border);
+    border-radius: var(--epic-radius-sm);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+    font-family: var(--epic-font);
+}
+
+.btn-pager:hover:not(:disabled) {
+    background: var(--epic-surface-3);
+    border-color: var(--epic-border-strong);
+}
+
+.btn-pager:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.history-page-select {
+    padding: 6px 10px;
+    background: var(--epic-surface-2);
+    color: var(--epic-text-primary);
+    border: 1px solid var(--epic-border);
+    border-radius: var(--epic-radius-sm);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: var(--epic-font);
+    color-scheme: dark;
+}
+
+.history-page-select option {
+    background: var(--epic-surface-2);
+    color: var(--epic-text-primary);
+}
+
+.history-pager-info {
+    font-size: 13px;
+    color: var(--epic-text-secondary);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* ============ 周标识标签（卡片内）============ */
+.week-tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--epic-blue);
+    background: var(--epic-blue-subtle);
+    padding: 1px 6px;
+    border-radius: var(--epic-radius-sm);
+    letter-spacing: 0.05em;
 }
 
 /* ============ 每周赠送记录 ============ */
@@ -849,13 +1111,43 @@ code {
         grid-template-columns: 1fr;
     }
     .epic-nav-status { font-size: 12px; }
+    .weekly-promo-grid { grid-template-columns: 1fr; }
+    .weekly-history-grid { grid-template-columns: 1fr; }
+    .history-pager {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+    .history-pager-left {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    .history-pager-info {
+        text-align: center;
+        width: 100%;
+    }
+    .history-page-size-label { display: none; }
+    .epic-hero h1 { font-size: 24px; }
+    .epic-hero { padding: 28px 20px; }
+    .game-title { font-size: 14px; }
+    .promo-discount-badge { font-size: 10px; padding: 2px 6px; }
 }
 
 @media (max-width: 480px) {
-    .epic-container { padding: 12px; }
-    .epic-hero { padding: 24px 16px; }
-    .epic-card { padding: 16px; }
-    .device-code-value { font-size: 24px; letter-spacing: 4px; }
+    .epic-container { padding: 10px; }
+    .epic-hero { padding: 20px 14px; }
+    .epic-hero h1 { font-size: 22px; }
+    .game-card { margin-bottom: 8px; }
+    .history-pager {
+        padding: 10px 12px;
+        gap: 8px;
+    }
+    .history-pager-left {
+        gap: 6px;
+    }
+    .btn-pager { padding: 5px 10px; font-size: 12px; }
+    .history-page-select, .history-page-size-select { padding: 4px 8px; font-size: 12px; }
+    .history-pager-info { font-size: 12px; }
 }
 
 /* ============ 可访问性 - 减少动画 ============ */

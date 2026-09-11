@@ -38,50 +38,16 @@ const navStatusText = document.getElementById("nav-status-text");
 const weeklyFreeSection = document.getElementById("weekly-free-section");
 const weeklyFreeGrid = document.getElementById("weekly-free-grid");
 const weeklyFreeHint = document.getElementById("weekly-free-hint");
+const weeklyPromoSection = document.getElementById("weekly-promo-section");
+const weeklyPromoGrid = document.getElementById("weekly-promo-grid");
+const weeklyPromoHint = document.getElementById("weekly-promo-hint");
 const weeklyHistorySection = document.getElementById("weekly-history-section");
 const weeklyHistoryGrid = document.getElementById("weekly-history-grid");
-const debugOutput = document.getElementById("device-auth-debug-output");
 
 // ============ 调试区 ============
 function setDebugOutput(obj) {
-    debugOutput.textContent = JSON.stringify(obj, null, 2);
+    document.getElementById("device-auth-debug-output").textContent = JSON.stringify(obj, null, 2);
 }
-
-document.getElementById("test-free-games-btn").addEventListener("click", async () => {
-    debugOutput.textContent = "⏳ 测试中...";
-    try {
-        const resp = await fetchWithTimeout("/api/free-games");
-        const data = await resp.json();
-        setDebugOutput(data);
-    } catch (err) {
-        setDebugOutput({ success: false, error: err.message });
-    }
-});
-
-document.getElementById("refresh-weekly-btn").addEventListener("click", async () => {
-    debugOutput.textContent = "⏳ 刷新中...";
-    await loadWeeklyFreeGames();
-    setDebugOutput({ success: true, message: "已刷新" });
-});
-
-document.getElementById("test-history-btn").addEventListener("click", async () => {
-    debugOutput.textContent = "⏳ 刷新中...";
-    await loadWeeklyHistory();
-    setDebugOutput({ success: true, message: "已刷新" });
-});
-
-document.getElementById("test-raw-btn").addEventListener("click", async () => {
-    debugOutput.textContent = "⏳ 获取原始数据...";
-    try {
-        const resp = await fetchWithTimeout("https://store-site-backend-static.ak.epicgames.com/freeGamesPromotions", {
-            params: { locale: "zh-CN", country: "CN" },
-        });
-        const data = await resp.json();
-        setDebugOutput(data);
-    } catch (err) {
-        setDebugOutput({ success: false, error: err.message });
-    }
-});
 
 // ============ 页面加载时初始化 ============
 document.addEventListener("DOMContentLoaded", async () => {
@@ -89,9 +55,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     navStatusDot.classList.add("configured");
     navStatusText.textContent = "已连接";
 
-    // 直接加载免费游戏和历史
+    // 直接加载免费游戏、促销和历史
     weeklyFreeSection.hidden = false;
+    weeklyPromoSection.hidden = false;
     weeklyHistorySection.hidden = false;
     await loadWeeklyFreeGames();
+    await loadPromotions();
     await loadWeeklyHistory();
+    // 封面和价格映射会由 loadWeeklyHistory 内的 loadCoverMap + loadPriceMap 并行加载
+    // 封面映射会由 loadWeeklyHistory 内的 loadCoverMap 并行加载
 });

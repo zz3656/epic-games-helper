@@ -222,6 +222,10 @@ class ClaimScheduler:
         """把本周免费游戏（含下周预告）写入 history.json
 
         只保存游戏清单数据，不保存状态/消息（因为我们不自动领取，状态无意义）。
+
+        注意：这里不判断“是否已过期”，过期判断在 /api/history 接口中按 expires_at 过滤。
+        这样保留一条原始记录，便于重启后 fingerprint 对比，同时前端可以展示尚未过期的记录
+        （例如本周刚开始免费的游戏在“现在免费”区与“历史赠送”区都能看到，不重复）。
         """
         started_at = datetime.now().isoformat(timespec="seconds")
         finished_at = started_at
@@ -236,6 +240,7 @@ class ClaimScheduler:
                 "namespace": g.namespace,
                 "offer_id_short": g.offer_id_short,
                 "image_url": g.image_url,
+                "description": g.description,
                 "end_date": g.end_date,
                 "original_price": g.original_price,
             })
@@ -249,9 +254,21 @@ class ClaimScheduler:
                 "namespace": u.namespace,
                 "offer_id_short": u.offer_id_short,
                 "image_url": u.image_url,
+                "description": u.description,
                 "end_date": u.end_date,
                 "original_price": u.original_price,
             })
+
+        # expires_at: 这条记录里所有“本周免费”游戏中最晚的 end_date。
+        # 下周预告 (upcoming) 不参与，因为预告的 end_date 在更远的未来，会让记录
+        # 始终不过期。上游 /api/history 过滤时依据该字段判断“是否仍在免费期”。
+        expires_at = ""
+        end_dates = [g.end_date for g in games if g.end_date]
+        if end_dates:
+            try:
+                expires_at = max(end_dates)
+            except Exception:
+                expires_at = end_dates[0]
 
         # 直接构造 dict 写入 history.json（不通过 ClaimResult，避免 dataclass 限制）
         record = {
@@ -264,6 +281,7 @@ class ClaimScheduler:
             "notified": notified,
             "type": "weekly_check",
             "week_id": datetime.now().strftime("%Y-W%V"),
+            "expires_at": expires_at,  # 本周免费游戏中最晚的 end_date（决定何时出现在历史）
             "games": games_data,
             "upcoming_games": upcoming_data,
         }

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Epic Games 免费游戏助手</title>
-    <link rel="stylesheet" href="/static/style.css?v=3">
+    <link rel="stylesheet" href="/static/style.css?v=13">
 </head>
 <body>
 
@@ -38,6 +38,15 @@
         </div>
     </div>
 
+    <!-- ===== 本周促销游戏 ===== -->
+    <section class="epic-section" id="weekly-promo-section" hidden>
+        <div class="epic-section-header">
+            <h2 class="epic-section-title">🏷️ 本周促销游戏</h2>
+            <span class="epic-section-meta" id="weekly-promo-hint">加载中…</span>
+        </div>
+        <div id="weekly-promo-grid" class="game-grid"></div>
+    </section>
+
     <!-- ===== 本周免费游戏 ===== -->
     <section class="epic-section" id="weekly-free-section" hidden>
         <div class="epic-section-header">
@@ -51,23 +60,9 @@
     <section class="epic-section" id="weekly-history-section" hidden>
         <div class="epic-section-header">
             <h2 class="epic-section-title">📜 历史赠送游戏</h2>
-            <span class="epic-section-meta">按周分组</span>
+            <span class="epic-section-meta" id="weekly-history-meta">加载中…</span>
         </div>
         <div id="weekly-history-grid"></div>
-    </section>
-
-    <!-- ===== 调试区 ===== -->
-    <section class="epic-section">
-        <details class="debug-section">
-            <summary>🛠 调试选项</summary>
-            <div class="debug-actions">
-                <button type="button" id="test-free-games-btn" class="btn-epic btn-epic-ghost btn-epic-sm">测试免费游戏 API</button>
-                <button type="button" id="refresh-weekly-btn" class="btn-epic btn-epic-ghost btn-epic-sm">刷新本周游戏</button>
-                <button type="button" id="test-history-btn" class="btn-epic btn-epic-ghost btn-epic-sm">刷新历史记录</button>
-                <button type="button" id="test-raw-btn" class="btn-epic btn-epic-ghost btn-epic-sm">查看原始数据</button>
-            </div>
-            <pre id="device-auth-debug-output" class="debug-output"></pre>
-        </details>
     </section>
 
     <!-- ===== Footer ===== -->
@@ -78,7 +73,7 @@
 
 </div>
 
-<script src="/static/device_auth.js?v=11"></script>
-<script src="/static/free_games.js?v=5"></script>
+<script src="/static/device_auth.js?v=15"></script>
+<script src="/static/free_games.js?v=14"></script>
 </body>
 </html>

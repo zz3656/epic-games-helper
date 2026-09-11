@@ -1,0 +1,1487 @@
+[
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-09-07T00:05:00",
+    "finished_at": "2026-09-07T00:05:00",
+    "screenshot_path": null,
+    "notified": true,
+    "type": "weekly_check",
+    "week_id": "2026-W37",
+    "games": [
+      {
+        "title": "Luftrausers",
+        "url": "https://store.epicgames.com/zh-CN/p/luftrausers-51e5e9",
+        "offer_id": "639daf403b554ee9b02eee5eedafc302/98fb3320a8964a1d85beb87e64eba312",
+        "namespace": "639daf403b554ee9b02eee5eedafc302",
+        "offer_id_short": "98fb3320a8964a1d85beb87e64eba312",
+        "image_url": "https://cdn1.epicgames.com/spt-assets/85ddeeec9d4243b3a2d78aab87bfae7f/luftrausers-11phb.png",
+        "end_date": "2026-09-17T15:00:00.000Z",
+        "original_price": "¥31.00",
+        "description": ""
+      },
+      {
+        "title": "Astral Ascent",
+        "url": "https://store.epicgames.com/zh-CN/p/astral-ascent-b33bc2",
+        "offer_id": "0cb5817d554740e8bedf9ceea32522bd/16bbe6e74ca34a739b80df882c60e412",
+        "namespace": "0cb5817d554740e8bedf9ceea32522bd",
+        "offer_id_short": "16bbe6e74ca34a739b80df882c60e412",
+        "image_url": "https://cdn1.epicgames.com/spt-assets/974c8a587d714d8d9e0c3b0fefe61a35/astral-ascent-15n1j.jpg",
+        "end_date": "2026-09-17T15:00:00.000Z",
+        "original_price": "¥68.00",
+        "description": ""
+      }
+    ],
+    "upcoming_games": [
+      {
+        "title": "心灵警探",
+        "url": "https://store.epicgames.com/zh-CN/p/mindcop-78e6c1",
+        "offer_id": "f20a4eda0f2d486ea73cab8af1224e31/7f196be5a78845ab98345f412833925b",
+        "namespace": "f20a4eda0f2d486ea73cab8af1224e31",
+        "offer_id_short": "7f196be5a78845ab98345f412833925b",
+        "image_url": "https://cdn1.epicgames.com/spt-assets/984cdc148ea6423e866ca6e04a1b429f/mindcop-1ppb5.jpg",
+        "end_date": "2026-09-24T15:00:00.000Z",
+        "original_price": "¥60.00"
+      },
+      {
+        "title": "Shogun Showdown",
+        "url": "https://store.epicgames.com/zh-CN/p/shogun-showdown-61832d",
+        "offer_id": "59ff4d481277487d8c073166ba7612d3/1cc9b18afb7b40b1847852ef828293dc",
+        "namespace": "59ff4d481277487d8c073166ba7612d3",
+        "offer_id_short": "1cc9b18afb7b40b1847852ef828293dc",
+        "image_url": "https://cdn1.epicgames.com/spt-assets/450bcfdb9c00453394d7ccc2948ba5db/shogun-showdown-6ynli.jpg",
+        "end_date": "2026-09-24T15:00:00.000Z",
+        "original_price": "¥47.00"
+      }
+    ]
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-08-31T00:05:00",
+    "finished_at": "2026-08-31T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W36",
+    "games": [
+      {
+        "title": "Alone With You",
+        "url": "https://store.epicgames.com/zh-CN/p/68a0e4e0a68d42ffba405593a89c55ba",
+        "offer_id": "b8cc76ce7d6645f0a282b843a072cc78",
+        "namespace": "cb87ac984c3c4c19b0a4e3e89048f187",
+        "offer_id_short": "b8cc76ce7d6645f0a282b843a072cc78",
+        "image_url": "",
+        "end_date": "2026-09-06T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Evan's Remains",
+        "url": "https://store.epicgames.com/zh-CN/p/evan's-remains",
+        "offer_id": "",
+        "namespace": "",
+        "offer_id_short": "",
+        "image_url": "",
+        "end_date": "2026-09-06T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-08-24T00:05:00",
+    "finished_at": "2026-08-24T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W35",
+    "games": [
+      {
+        "title": "Rival Stars Horse Racing : Desktop Edition",
+        "url": "https://store.epicgames.com/zh-CN/p/c27af3c6ec3a47afb720e580138de63e",
+        "offer_id": "8f1fcf01e32e4fd4b2ae0a9737992760",
+        "namespace": "f570d80aa4fe463ca53c4410d1c75e1e",
+        "offer_id_short": "8f1fcf01e32e4fd4b2ae0a9737992760",
+        "image_url": "",
+        "end_date": "2026-08-30T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-08-17T00:05:00",
+    "finished_at": "2026-08-17T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W34",
+    "games": [
+      {
+        "title": "Cardpocalypse Standard Edition",
+        "url": "https://store.epicgames.com/zh-CN/p/cardpocalypsegeneralaudience",
+        "offer_id": "b467b7d3570e44c0b84e59475f4a5636",
+        "namespace": "2bfd5ca43ef443739ada168e017e1b78",
+        "offer_id_short": "b467b7d3570e44c0b84e59475f4a5636",
+        "image_url": "",
+        "end_date": "2026-08-23T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Epic Mage Bundle",
+        "url": "https://store.epicgames.com/zh-CN/p/epic-mage-bundle",
+        "offer_id": "a802acab90af4a07952a07a9fa677f2f",
+        "namespace": "72520902fc594621b6daa5a6217b4ee7",
+        "offer_id_short": "a802acab90af4a07952a07a9fa677f2f",
+        "image_url": "",
+        "end_date": "2026-08-23T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-08-10T00:05:00",
+    "finished_at": "2026-08-10T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W33",
+    "games": [
+      {
+        "title": "Caravan SandWitch",
+        "url": "https://store.epicgames.com/zh-CN/p/70e9a8a90305449a88a38b708399e605",
+        "offer_id": "0e44600a079e419abbb291ccf5af9ee7",
+        "namespace": "45b137b2ecd14e01a54b52e575f1632d",
+        "offer_id_short": "0e44600a079e419abbb291ccf5af9ee7",
+        "image_url": "",
+        "end_date": "2026-08-16T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Beholder: Conductor",
+        "url": "https://store.epicgames.com/zh-CN/p/beholder-conductor",
+        "offer_id": "",
+        "namespace": "",
+        "offer_id_short": "",
+        "image_url": "",
+        "end_date": "2026-08-16T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-08-03T00:05:00",
+    "finished_at": "2026-08-03T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W32",
+    "games": [
+      {
+        "title": "Beacon Pines",
+        "url": "https://store.epicgames.com/zh-CN/p/9e9a438c651a49799c3ddd94a0c3f4c0",
+        "offer_id": "871cc4ff18444059890a4d28653a62d5",
+        "namespace": "1c83ea77e736438f9852b31aeb4f7a20",
+        "offer_id_short": "871cc4ff18444059890a4d28653a62d5",
+        "image_url": "",
+        "end_date": "2026-08-09T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "A Guidebook Of Babel",
+        "url": "https://store.epicgames.com/zh-CN/p/a-guidebook-of-babel",
+        "offer_id": "",
+        "namespace": "",
+        "offer_id_short": "",
+        "image_url": "",
+        "end_date": "2026-08-09T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-07-27T00:05:00",
+    "finished_at": "2026-07-27T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W31",
+    "games": [
+      {
+        "title": "OTXO",
+        "url": "https://store.epicgames.com/zh-CN/p/63e3482da69d4332bd73ce23706e78eb",
+        "offer_id": "fb86769d4908427986ca9f7d94b581c2",
+        "namespace": "dfe95c9009f548b0b167b3d65cc91979",
+        "offer_id_short": "fb86769d4908427986ca9f7d94b581c2",
+        "image_url": "",
+        "end_date": "2026-08-02T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Sol Cesto",
+        "url": "https://store.epicgames.com/zh-CN/p/sol-cesto",
+        "offer_id": "c71375f1ac9444fcae1ca584a53ba6f0",
+        "namespace": "ce5d3cf74f36450cb7136952dc5b520f",
+        "offer_id_short": "c71375f1ac9444fcae1ca584a53ba6f0",
+        "image_url": "",
+        "end_date": "2026-08-02T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-07-20T00:05:00",
+    "finished_at": "2026-07-20T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W30",
+    "games": [
+      {
+        "title": "Foretales",
+        "url": "https://store.epicgames.com/zh-CN/p/a6dcabac79154e218bd3c7d4a8cad8a7",
+        "offer_id": "223c59e227e74e079a1bbe5a234b896f",
+        "namespace": "c5730ad3d7004a65a472a7699b88008a",
+        "offer_id_short": "223c59e227e74e079a1bbe5a234b896f",
+        "image_url": "",
+        "end_date": "2026-07-26T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-07-13T00:05:00",
+    "finished_at": "2026-07-13T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W29",
+    "games": [
+      {
+        "title": "Luto",
+        "url": "https://store.epicgames.com/zh-CN/p/67459b70a96e40ca96d5676d8a4fd8c5",
+        "offer_id": "c27f2bb0dd9b4c4ca4973e653ab8a5be",
+        "namespace": "9f3ffc77b7264d63859bfd9bc935c9f8",
+        "offer_id_short": "c27f2bb0dd9b4c4ca4973e653ab8a5be",
+        "image_url": "",
+        "end_date": "2026-07-19T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Echo Generation: Midnight Edition",
+        "url": "https://store.epicgames.com/zh-CN/p/cbf3f5857ec241bab03dbb7eb03efad8",
+        "offer_id": "371545146a944478ad5a87f9b581ac29",
+        "namespace": "2c198b4055e64df698944727dbb561ea",
+        "offer_id_short": "371545146a944478ad5a87f9b581ac29",
+        "image_url": "",
+        "end_date": "2026-07-19T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-07-06T00:05:00",
+    "finished_at": "2026-07-06T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W28",
+    "games": [
+      {
+        "title": "Nova Lands",
+        "url": "https://store.epicgames.com/zh-CN/p/acb83bd813054e599598de9e76f6d95d",
+        "offer_id": "e5da2c017d4d4afab9f4c56525b66100",
+        "namespace": "740ba4a6fbed4062a9c43d52c5996b0b",
+        "offer_id_short": "e5da2c017d4d4afab9f4c56525b66100",
+        "image_url": "",
+        "end_date": "2026-07-12T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Tattoo Tycoon",
+        "url": "https://store.epicgames.com/zh-CN/p/tattoo-tycoon",
+        "offer_id": "f247e0af293645bda266fa9957d82d62",
+        "namespace": "b0a2eaef9e8e4fca9d8f9d4aa26fed4d",
+        "offer_id_short": "f247e0af293645bda266fa9957d82d62",
+        "image_url": "",
+        "end_date": "2026-07-12T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Princess Farmer",
+        "url": "https://store.epicgames.com/zh-CN/p/princess-farmer",
+        "offer_id": "",
+        "namespace": "",
+        "offer_id_short": "",
+        "image_url": "",
+        "end_date": "2026-07-12T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-06-29T00:05:00",
+    "finished_at": "2026-06-29T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W27",
+    "games": [
+      {
+        "title": "River City Girls 2",
+        "url": "https://store.epicgames.com/zh-CN/p/f6229ed5b32d4e098b930103b6470b49",
+        "offer_id": "9bf3d3188d1e498095bc23c0955538d9",
+        "namespace": "973ce75835994a35ab386d56ed2dffa3",
+        "offer_id_short": "9bf3d3188d1e498095bc23c0955538d9",
+        "image_url": "",
+        "end_date": "2026-07-05T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "I Have No Mouth, and I Must Scream",
+        "url": "https://store.epicgames.com/zh-CN/p/0937dc8ff7874fb8897a678d8a27c9ac",
+        "offer_id": "4ef54d5829b04656902dfa1f29b3b732",
+        "namespace": "2e13c6ccfb3147ec8c67985160c48296",
+        "offer_id_short": "4ef54d5829b04656902dfa1f29b3b732",
+        "image_url": "",
+        "end_date": "2026-07-05T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Sophia the Traveler",
+        "url": "https://store.epicgames.com/zh-CN/p/sophia-the-traveler",
+        "offer_id": "",
+        "namespace": "",
+        "offer_id_short": "",
+        "image_url": "",
+        "end_date": "2026-07-05T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-06-22T00:05:00",
+    "finished_at": "2026-06-22T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W26",
+    "games": [
+      {
+        "title": "RollerCoaster Tycoon 3 Complete Edition",
+        "url": "https://store.epicgames.com/zh-CN/p/mainegeneralaudience",
+        "offer_id": "4ec50a302f1449b3bf706a199c333ab8",
+        "namespace": "f01b3e0178d448f0b93911e292d8e614",
+        "offer_id_short": "4ec50a302f1449b3bf706a199c333ab8",
+        "image_url": "",
+        "end_date": "2026-06-28T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Voidwrought",
+        "url": "https://store.epicgames.com/zh-CN/p/8d0e69e541454ac7818117af13960b30",
+        "offer_id": "bbccf66ad70e492d812e031e17f93b9d",
+        "namespace": "1c6e13038e00432ba0a3c11bb85d1d5f",
+        "offer_id_short": "bbccf66ad70e492d812e031e17f93b9d",
+        "image_url": "",
+        "end_date": "2026-06-28T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Teenage Mutant Ninja Turtles - Shredder's Revenge",
+        "url": "https://store.epicgames.com/zh-CN/p/teenage-mutant-ninja-turtles---shredder's-revenge",
+        "offer_id": "",
+        "namespace": "",
+        "offer_id_short": "",
+        "image_url": "",
+        "end_date": "2026-06-28T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-06-15T00:05:00",
+    "finished_at": "2026-06-15T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W25",
+    "games": [
+      {
+        "title": "Citizen Sleeper",
+        "url": "https://store.epicgames.com/zh-CN/p/da528841e0eb43d8b93fd243c6767b0c",
+        "offer_id": "ea365d314ecf4224a5f58d2d7430e7aa",
+        "namespace": "e4ef0c8c500a41eaa57c53d32410595d",
+        "offer_id_short": "ea365d314ecf4224a5f58d2d7430e7aa",
+        "image_url": "",
+        "end_date": "2026-06-21T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "ROBOBEAT",
+        "url": "https://store.epicgames.com/zh-CN/p/4ee365fd76704f37ae3dc13676f1ac61",
+        "offer_id": "aee7ec395d054078a48d867849e2a550",
+        "namespace": "9704b88f02244a60b9b0ab81e0e31389",
+        "offer_id_short": "aee7ec395d054078a48d867849e2a550",
+        "image_url": "",
+        "end_date": "2026-06-21T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Construction Simulator 3",
+        "url": "https://store.epicgames.com/zh-CN/p/construction-simulator-3",
+        "offer_id": "",
+        "namespace": "",
+        "offer_id_short": "",
+        "image_url": "",
+        "end_date": "2026-06-21T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-06-08T00:05:00",
+    "finished_at": "2026-06-08T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W24",
+    "games": [
+      {
+        "title": "The Ouroboros King",
+        "url": "https://store.epicgames.com/zh-CN/p/the-ouroboros-king",
+        "offer_id": "7f0ab2828f9743d0abc6612a11222fdf",
+        "namespace": "b002ccbe10f946f082a63bf85fa30558",
+        "offer_id_short": "7f0ab2828f9743d0abc6612a11222fdf",
+        "image_url": "",
+        "end_date": "2026-06-14T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Warhammer 40K Speed Freeks",
+        "url": "https://store.epicgames.com/zh-CN/p/b28e038bd68b4e80840e7fb8b747de54",
+        "offer_id": "eb6ae87e73d94d2c96bab3c4da4dd3de",
+        "namespace": "e64225d40c214f32a71ccf6a7a612d6b",
+        "offer_id_short": "eb6ae87e73d94d2c96bab3c4da4dd3de",
+        "image_url": "",
+        "end_date": "2026-06-14T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Guild of Dungeoneering Ultimate Edition",
+        "url": "https://store.epicgames.com/zh-CN/p/guild-of-dungeoneering-ultimate-edition",
+        "offer_id": "",
+        "namespace": "",
+        "offer_id_short": "",
+        "image_url": "",
+        "end_date": "2026-06-14T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-06-01T00:05:00",
+    "finished_at": "2026-06-01T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W23",
+    "games": [
+      {
+        "title": "Rogue Waters",
+        "url": "https://store.epicgames.com/zh-CN/p/megasale-mysterygame-2026-week23-game2",
+        "offer_id": "a6a2d59fa54946dbbf16f14730c2e5f0",
+        "namespace": "d5241c76f178492ea1540fce45616757",
+        "offer_id_short": "a6a2d59fa54946dbbf16f14730c2e5f0",
+        "image_url": "",
+        "end_date": "2026-06-07T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Songs of Conquest",
+        "url": "https://store.epicgames.com/zh-CN/p/megasale-mysterygame-2026-week23-game1",
+        "offer_id": "62b6d302e2bd41039449b1f2f9608748",
+        "namespace": "d5241c76f178492ea1540fce45616757",
+        "offer_id_short": "62b6d302e2bd41039449b1f2f9608748",
+        "image_url": "",
+        "end_date": "2026-06-07T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Wytchwood",
+        "url": "https://store.epicgames.com/zh-CN/p/wytchwood",
+        "offer_id": "",
+        "namespace": "",
+        "offer_id_short": "",
+        "image_url": "",
+        "end_date": "2026-06-07T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-05-25T00:05:00",
+    "finished_at": "2026-05-25T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W22",
+    "games": [
+      {
+        "title": "LONESTAR",
+        "url": "https://store.epicgames.com/zh-CN/p/megasale-mysterygame-2026-week22-game1",
+        "offer_id": "9621cc6e5d32437ca3dd998de177f6da",
+        "namespace": "d5241c76f178492ea1540fce45616757",
+        "offer_id_short": "9621cc6e5d32437ca3dd998de177f6da",
+        "image_url": "",
+        "end_date": "2026-05-31T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Calico",
+        "url": "https://store.epicgames.com/zh-CN/p/megasale-mysterygame-2026-week22-game2",
+        "offer_id": "7fc5abc8f11c471e837ddd00ce963350",
+        "namespace": "d5241c76f178492ea1540fce45616757",
+        "offer_id_short": "7fc5abc8f11c471e837ddd00ce963350",
+        "image_url": "",
+        "end_date": "2026-05-31T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Northgard",
+        "url": "https://store.epicgames.com/zh-CN/p/northgard",
+        "offer_id": "",
+        "namespace": "",
+        "offer_id_short": "",
+        "image_url": "",
+        "end_date": "2026-05-31T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-05-18T00:05:00",
+    "finished_at": "2026-05-18T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W21",
+    "games": [
+      {
+        "title": "Down in Bermuda",
+        "url": "https://store.epicgames.com/zh-CN/p/megasale-mysterygame-2026-week21-game2",
+        "offer_id": "cd37ebd7ce804df9b51b84578e631b8a",
+        "namespace": "d5241c76f178492ea1540fce45616757",
+        "offer_id_short": "cd37ebd7ce804df9b51b84578e631b8a",
+        "image_url": "",
+        "end_date": "2026-05-24T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Tomb Raider I-III Remastered Starring Lara Croft",
+        "url": "https://store.epicgames.com/zh-CN/p/megasale-mysterygame-2026-week21-game1",
+        "offer_id": "9e2567e57e61458686d53f5aeaf1e2e0",
+        "namespace": "d5241c76f178492ea1540fce45616757",
+        "offer_id_short": "9e2567e57e61458686d53f5aeaf1e2e0",
+        "image_url": "",
+        "end_date": "2026-05-24T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Monument Valley 3",
+        "url": "https://store.epicgames.com/zh-CN/p/monument-valley-3",
+        "offer_id": "",
+        "namespace": "",
+        "offer_id_short": "",
+        "image_url": "",
+        "end_date": "2026-05-24T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-05-11T00:05:00",
+    "finished_at": "2026-05-11T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W20",
+    "games": [
+      {
+        "title": "The Telltale Batman Shadows Edition",
+        "url": "https://store.epicgames.com/zh-CN/p/megasale-mysterygame-2026-02",
+        "offer_id": "73a4416d5cdb42f682d504fdf48e987b",
+        "namespace": "d5241c76f178492ea1540fce45616757",
+        "offer_id_short": "73a4416d5cdb42f682d504fdf48e987b",
+        "image_url": "",
+        "end_date": "2026-05-17T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Sunderfolk - Standard Edition",
+        "url": "https://store.epicgames.com/zh-CN/p/megasale-mysterygame-2026",
+        "offer_id": "190cb955f17f48dcb8576aa8288c887f",
+        "namespace": "d5241c76f178492ea1540fce45616757",
+        "offer_id_short": "190cb955f17f48dcb8576aa8288c887f",
+        "image_url": "",
+        "end_date": "2026-05-17T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-05-04T00:05:00",
+    "finished_at": "2026-05-04T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W19",
+    "games": [
+      {
+        "title": "Arranger: A Role-Puzzling Adventure",
+        "url": "https://store.epicgames.com/zh-CN/p/8883fa6958a24a00b6f33166e4552833",
+        "offer_id": "4fb95c3f11754061b2b1a94e60d848bd",
+        "namespace": "2df8b055a5674c8e9211fc51f8efd210",
+        "offer_id_short": "4fb95c3f11754061b2b1a94e60d848bd",
+        "image_url": "",
+        "end_date": "2026-05-10T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Trash Goblin",
+        "url": "https://store.epicgames.com/zh-CN/p/7ea9b97f6a8b4c5d8047733207c5c65c",
+        "offer_id": "40980262fdb24c149094f3febfe84cb6",
+        "namespace": "f14e8d865ad04b93a5df850ce7a59fe2",
+        "offer_id_short": "40980262fdb24c149094f3febfe84cb6",
+        "image_url": "",
+        "end_date": "2026-05-10T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Teacup",
+        "url": "https://store.epicgames.com/zh-CN/p/teacup",
+        "offer_id": "",
+        "namespace": "",
+        "offer_id_short": "",
+        "image_url": "",
+        "end_date": "2026-05-10T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-04-27T00:05:00",
+    "finished_at": "2026-04-27T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W18",
+    "games": [
+      {
+        "title": "Oddsparks: An Automation Adventure",
+        "url": "https://store.epicgames.com/zh-CN/p/e16c97c0da0b4e5aa507e930befb1a25",
+        "offer_id": "102da1ac6e864d7f84889f2c0a107ee2",
+        "namespace": "77c83b36cd1047f7aceeef2e5f84ab85",
+        "offer_id_short": "102da1ac6e864d7f84889f2c0a107ee2",
+        "image_url": "",
+        "end_date": "2026-05-03T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Streets of Rage 4",
+        "url": "https://store.epicgames.com/zh-CN/p/streets-of-rage-4",
+        "offer_id": "",
+        "namespace": "",
+        "offer_id_short": "",
+        "image_url": "",
+        "end_date": "2026-05-03T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-04-20T00:05:00",
+    "finished_at": "2026-04-20T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W17",
+    "games": [
+      {
+        "title": "DOOMBLADE",
+        "url": "https://store.epicgames.com/zh-CN/p/ed9fee5cea29495394853e134f27a291",
+        "offer_id": "9e7d6a034aaf450dacda4b51695d113a",
+        "namespace": "12a3a68913864eaa8420e575eb6dbd42",
+        "offer_id_short": "9e7d6a034aaf450dacda4b51695d113a",
+        "image_url": "",
+        "end_date": "2026-04-26T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "911 Operator",
+        "url": "https://store.epicgames.com/zh-CN/p/911-operator",
+        "offer_id": "",
+        "namespace": "",
+        "offer_id_short": "",
+        "image_url": "",
+        "end_date": "2026-04-26T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-04-13T00:05:00",
+    "finished_at": "2026-04-13T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W16",
+    "games": [
+      {
+        "title": "The Stone of Madness",
+        "url": "https://store.epicgames.com/zh-CN/p/the-stone-of-madness",
+        "offer_id": "3d11f228c8a442318bc17abf13f7db3b",
+        "namespace": "bc51d32ca88b41bda1e50f5876c0b16e",
+        "offer_id_short": "3d11f228c8a442318bc17abf13f7db3b",
+        "image_url": "",
+        "end_date": "2026-04-19T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Broken Sword : Reforged",
+        "url": "https://store.epicgames.com/zh-CN/p/broken-sword--reforged",
+        "offer_id": "",
+        "namespace": "",
+        "offer_id_short": "",
+        "image_url": "",
+        "end_date": "2026-04-19T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-04-06T00:05:00",
+    "finished_at": "2026-04-06T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W15",
+    "games": [
+      {
+        "title": "Prop Sumo",
+        "url": "https://store.epicgames.com/zh-CN/p/67a9bcbc6b8e411e9265afb380fea91f",
+        "offer_id": "bc9b3091841840ad974ff525873d48c1",
+        "namespace": "a01818d165284996896acce560c669fa",
+        "offer_id_short": "bc9b3091841840ad974ff525873d48c1",
+        "image_url": "",
+        "end_date": "2026-04-12T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Dumb Ways to Draw",
+        "url": "https://store.epicgames.com/zh-CN/p/dumb-ways-to-draw",
+        "offer_id": "",
+        "namespace": "",
+        "offer_id_short": "",
+        "image_url": "",
+        "end_date": "2026-04-12T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-03-30T00:05:00",
+    "finished_at": "2026-03-30T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W14",
+    "games": [
+      {
+        "title": "Clone Drone in the Danger Zone",
+        "url": "https://store.epicgames.com/zh-CN/p/4d7e959581394dc4aee2039844753beb",
+        "offer_id": "c6479f31043943d0b1710cc5983f53c6",
+        "namespace": "59d27ef047494b999bf0b04ddc471a07",
+        "offer_id_short": "c6479f31043943d0b1710cc5983f53c6",
+        "image_url": "",
+        "end_date": "2026-04-05T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "TOMAK: Save the Earth Regeneration",
+        "url": "https://store.epicgames.com/zh-CN/p/798328bff911452783523d61986170c0",
+        "offer_id": "9f67865fcf0749a58f4d35827473266f",
+        "namespace": "7de6896ed120435fba9433d2732dadb4",
+        "offer_id_short": "9f67865fcf0749a58f4d35827473266f",
+        "image_url": "",
+        "end_date": "2026-04-05T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Dumb Ways to Die 2: The Games",
+        "url": "https://store.epicgames.com/zh-CN/p/dumb-ways-to-die-2-the-games",
+        "offer_id": "",
+        "namespace": "",
+        "offer_id_short": "",
+        "image_url": "",
+        "end_date": "2026-04-05T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-03-23T00:05:00",
+    "finished_at": "2026-03-23T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W13",
+    "games": [
+      {
+        "title": "Hyper Echelon",
+        "url": "https://store.epicgames.com/zh-CN/p/39e8285c09224707ab83d5c256e9b41b",
+        "offer_id": "5d15c054641543c9a535b3b4ac29e843",
+        "namespace": "5ffdf739f9b549ebba9caf3596e7c632",
+        "offer_id_short": "5d15c054641543c9a535b3b4ac29e843",
+        "image_url": "",
+        "end_date": "2026-03-29T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Havendock",
+        "url": "https://store.epicgames.com/zh-CN/p/454bc0b5893f46a885bd86a6589ee67a",
+        "offer_id": "d7b336a5c49f4a14b16359193caeb296",
+        "namespace": "dc6b31eb3a7540f28ccff83204aa1c3d",
+        "offer_id_short": "d7b336a5c49f4a14b16359193caeb296",
+        "image_url": "",
+        "end_date": "2026-03-29T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "The Wreck",
+        "url": "https://store.epicgames.com/zh-CN/p/the-wreck",
+        "offer_id": "",
+        "namespace": "",
+        "offer_id_short": "",
+        "image_url": "",
+        "end_date": "2026-03-29T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-03-16T00:05:00",
+    "finished_at": "2026-03-16T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W12",
+    "games": [
+      {
+        "title": "Electrician Simulator",
+        "url": "https://store.epicgames.com/zh-CN/p/d4645b0dc574438e95d20c6a31d3a0f7",
+        "offer_id": "b3d56c3e27fc4816bf6cc0cefecd4948",
+        "namespace": "d400b874b09b4cd49d149358c67aa453",
+        "offer_id_short": "b3d56c3e27fc4816bf6cc0cefecd4948",
+        "image_url": "",
+        "end_date": "2026-12-08T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "World of Warships — Epic Anniversary Tachibana Pack",
+        "url": "https://store.epicgames.com/zh-CN/p/world-of-warships-tachibana-lima-pack",
+        "offer_id": "d3b29bd0dac74187970db0d79bf4b18e",
+        "namespace": "84c76746bce94effb8e1047fabfd7eb7",
+        "offer_id_short": "d3b29bd0dac74187970db0d79bf4b18e",
+        "image_url": "",
+        "end_date": "2026-12-08T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Potion Permit",
+        "url": "https://store.epicgames.com/zh-CN/p/potion-permit",
+        "offer_id": "",
+        "namespace": "",
+        "offer_id_short": "",
+        "image_url": "",
+        "end_date": "2026-12-08T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-03-09T00:05:00",
+    "finished_at": "2026-03-09T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W11",
+    "games": [
+      {
+        "title": "Cozy Grove",
+        "url": "https://store.epicgames.com/zh-CN/p/cozy-grove",
+        "offer_id": "c367569acede446995c5a3663e993446",
+        "namespace": "768ec2d3b5114ac4a800631b12ee3f31",
+        "offer_id_short": "c367569acede446995c5a3663e993446",
+        "image_url": "",
+        "end_date": "2026-11-08T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Isonzo",
+        "url": "https://store.epicgames.com/zh-CN/p/isonzo-2",
+        "offer_id": "4889207626a44fed973f5e72ae79ce9d",
+        "namespace": "30de69013f3b41b0ba594a8ef3b693ba",
+        "offer_id_short": "4889207626a44fed973f5e72ae79ce9d",
+        "image_url": "",
+        "end_date": "2026-11-08T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-03-02T00:05:00",
+    "finished_at": "2026-03-02T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W10",
+    "games": [
+      {
+        "title": "Turnip Boy Robs a Bank",
+        "url": "https://store.epicgames.com/zh-CN/p/000ff62d1877415589bb126e900a88e8",
+        "offer_id": "68d9f0e261464ba284e10418d98532ea",
+        "namespace": "263de26be57d43528bb9c7fdb133b9fe",
+        "offer_id_short": "68d9f0e261464ba284e10418d98532ea",
+        "image_url": "",
+        "end_date": "2026-10-08T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Little Nightmares",
+        "url": "https://store.epicgames.com/zh-CN/p/little-nightmares",
+        "offer_id": "",
+        "namespace": "",
+        "offer_id_short": "",
+        "image_url": "",
+        "end_date": "2026-10-08T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-02-23T00:05:00",
+    "finished_at": "2026-02-23T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W09",
+    "games": [
+      {
+        "title": "Boxes: Lost Fragments",
+        "url": "https://store.epicgames.com/zh-CN/p/a9ef6e969aa249ef936923216909d747",
+        "offer_id": "14bd618815aa43209a3613e5bc2c2274",
+        "namespace": "abc34708e5a0420287f52302582e3fec",
+        "offer_id_short": "14bd618815aa43209a3613e5bc2c2274",
+        "image_url": "",
+        "end_date": "2026-09-08T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "My Night Job",
+        "url": "https://store.epicgames.com/zh-CN/p/bce593b9b8754aa595ae4123f36ad4a9",
+        "offer_id": "0c9ceba4cc60473f97510ab2514a4b6e",
+        "namespace": "08e225ed73a2433198c025de20ec8173",
+        "offer_id_short": "0c9ceba4cc60473f97510ab2514a4b6e",
+        "image_url": "",
+        "end_date": "2026-09-08T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-02-16T00:05:00",
+    "finished_at": "2026-02-16T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W08",
+    "games": [
+      {
+        "title": "Return to Ash",
+        "url": "https://store.epicgames.com/zh-CN/p/return-to-ash",
+        "offer_id": "06cd7ef2079646dcb6c5b04e04e1d676",
+        "namespace": "511a5b709ee242fb9603378b071d99d7",
+        "offer_id_short": "06cd7ef2079646dcb6c5b04e04e1d676",
+        "image_url": "",
+        "end_date": "2026-08-08T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "STALCRAFT: X Starter Edition",
+        "url": "https://store.epicgames.com/zh-CN/p/stalcraft-x-starter-edition",
+        "offer_id": "d6111db209c34b068736ca33411c9209",
+        "namespace": "1319020a7c08408489d4dc9c5b1df4c0",
+        "offer_id_short": "d6111db209c34b068736ca33411c9209",
+        "image_url": "",
+        "end_date": "2026-08-08T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Residual",
+        "url": "https://store.epicgames.com/zh-CN/p/residual",
+        "offer_id": "",
+        "namespace": "",
+        "offer_id_short": "",
+        "image_url": "",
+        "end_date": "2026-08-08T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-02-09T00:05:00",
+    "finished_at": "2026-02-09T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W07",
+    "games": [
+      {
+        "title": "The Darkside Detective A Fumble in the Dark",
+        "url": "https://store.epicgames.com/zh-CN/p/b87bb60e2398412e82ba540e50ac6222",
+        "offer_id": "9e3c580751a94c6d8a1b8b08b2e3d21f",
+        "namespace": "87375f89fc4c4c7a8c681cf21febee06",
+        "offer_id_short": "9e3c580751a94c6d8a1b8b08b2e3d21f",
+        "image_url": "",
+        "end_date": "2026-07-08T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Nobody Wants to Die",
+        "url": "https://store.epicgames.com/zh-CN/p/eea910991d674322b3832f9b7bbefb7b",
+        "offer_id": "9da459f7c3984877bd5a12bdc3b6b3af",
+        "namespace": "60b8d9b4c2be4e34aeec311c953c2ee2",
+        "offer_id_short": "9da459f7c3984877bd5a12bdc3b6b3af",
+        "image_url": "",
+        "end_date": "2026-07-08T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-02-02T00:05:00",
+    "finished_at": "2026-02-02T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W06",
+    "games": [
+      {
+        "title": "Botany Manor",
+        "url": "https://store.epicgames.com/zh-CN/p/61eca1a9e42243d29e93b02510d88d83",
+        "offer_id": "855a903d4f694353ac20f74321f6e400",
+        "namespace": "969bbfac9e7840a986c1d594ccd55c01",
+        "offer_id_short": "855a903d4f694353ac20f74321f6e400",
+        "image_url": "",
+        "end_date": "2026-06-08T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Pixel Gun 3D: Poison Retro Set",
+        "url": "https://store.epicgames.com/zh-CN/p/poison-retro-set",
+        "offer_id": "f643a600e99c43cca99d1ca37b41fe33",
+        "namespace": "964bca52db2845498a7040b3733c4441",
+        "offer_id_short": "f643a600e99c43cca99d1ca37b41fe33",
+        "image_url": "",
+        "end_date": "2026-06-08T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-01-26T00:05:00",
+    "finished_at": "2026-01-26T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W05",
+    "games": [
+      {
+        "title": "Definitely Not Fried Chicken",
+        "url": "https://store.epicgames.com/zh-CN/p/6b5b8432768a423f848fd85a61c97623",
+        "offer_id": "b916500f733b4973802bdb4fdb276515",
+        "namespace": "8d8fb21ac3554271853582bad9d394d7",
+        "offer_id_short": "b916500f733b4973802bdb4fdb276515",
+        "image_url": "",
+        "end_date": "2026-05-08T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Faily Brakes 2",
+        "url": "https://store.epicgames.com/zh-CN/p/faily-brakes-2",
+        "offer_id": "",
+        "namespace": "",
+        "offer_id_short": "",
+        "image_url": "",
+        "end_date": "2026-05-08T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-01-19T00:05:00",
+    "finished_at": "2026-01-19T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W04",
+    "games": [
+      {
+        "title": "Rustler - Grand Theft Horse",
+        "url": "https://store.epicgames.com/zh-CN/p/rustler-grand-theft-horse",
+        "offer_id": "3d10f32b87b94b769524cd44a12e634a",
+        "namespace": "aca2ee0619aa482791f0a71dbf3eeac0",
+        "offer_id_short": "3d10f32b87b94b769524cd44a12e634a",
+        "image_url": "",
+        "end_date": "2026-04-08T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "The Forest Quartet",
+        "url": "https://store.epicgames.com/zh-CN/p/the-forest-quartet",
+        "offer_id": "",
+        "namespace": "",
+        "offer_id_short": "",
+        "image_url": "",
+        "end_date": "2026-04-08T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-01-12T00:05:00",
+    "finished_at": "2026-01-12T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W03",
+    "games": [
+      {
+        "title": "Styx: Master of Shadows",
+        "url": "https://store.epicgames.com/zh-CN/p/0aa23c9aff4045d7b4b9b5ccc06b5c03",
+        "offer_id": "ed109adce3c042f792f48d629221ac8b",
+        "namespace": "962cf46ed59b42c1a16834193a7cde54",
+        "offer_id_short": "ed109adce3c042f792f48d629221ac8b",
+        "image_url": "",
+        "end_date": "2026-03-08T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Styx: Shards of Darkness - Deluxe Edition",
+        "url": "https://store.epicgames.com/zh-CN/p/81e2a51d2be949b986993cdca25f4d7d",
+        "offer_id": "9b99ffa5a53e4317824f4ccb2b6e68d2",
+        "namespace": "795fdebb6c6e497d98cee43057286743",
+        "offer_id_short": "9b99ffa5a53e4317824f4ccb2b6e68d2",
+        "image_url": "",
+        "end_date": "2026-03-08T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Dumb Ways to Die",
+        "url": "https://store.epicgames.com/zh-CN/p/dumb-ways-to-die",
+        "offer_id": "",
+        "namespace": "",
+        "offer_id_short": "",
+        "image_url": "",
+        "end_date": "2026-03-08T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2026-01-05T00:05:00",
+    "finished_at": "2026-01-05T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W02",
+    "games": [
+      {
+        "title": "Bouncemasters",
+        "url": "https://store.epicgames.com/zh-CN/p/bouncemasters",
+        "offer_id": "",
+        "namespace": "",
+        "offer_id_short": "",
+        "image_url": "",
+        "end_date": "2026-02-08T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  },
+  {
+    "success": true,
+    "username": "scheduler",
+    "error": null,
+    "started_at": "2025-12-29T00:05:00",
+    "finished_at": "2025-12-29T00:05:00",
+    "screenshot_path": null,
+    "notified": false,
+    "type": "weekly_check",
+    "week_id": "2026-W01",
+    "games": [
+      {
+        "title": "Wildgate",
+        "url": "https://store.epicgames.com/zh-CN/p/mysterygame2025-17",
+        "offer_id": "acd0b5048a0d43ec80909788a388964a",
+        "namespace": "d5241c76f178492ea1540fce45616757",
+        "offer_id_short": "acd0b5048a0d43ec80909788a388964a",
+        "image_url": "",
+        "end_date": "2026-01-08T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Total War: THREE KINGDOMS",
+        "url": "https://store.epicgames.com/zh-CN/p/mysterygame2025-16",
+        "offer_id": "77f90158ddc1488baeb4155bd934fbbd",
+        "namespace": "d5241c76f178492ea1540fce45616757",
+        "offer_id_short": "77f90158ddc1488baeb4155bd934fbbd",
+        "image_url": "",
+        "end_date": "2026-01-08T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      },
+      {
+        "title": "Skul: The Hero Slayer",
+        "url": "https://store.epicgames.com/zh-CN/p/skul-the-hero-slayer",
+        "offer_id": "",
+        "namespace": "",
+        "offer_id_short": "",
+        "image_url": "",
+        "end_date": "2026-01-08T15:00:00.000Z",
+        "original_price": "",
+        "description": ""
+      }
+    ],
+    "upcoming_games": []
+  }
+]

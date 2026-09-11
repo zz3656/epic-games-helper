@@ -45,7 +45,8 @@
 | ✅ | **Pure-black canvas** + electric-blue accent (`#0078F2`) — matches Epic Store design |
 | ✅ | **Sticky nav** with connection status |
 | ✅ | **Hero banner** with weekly update info |
-| ✅ | **Weekly free games grid** — cover, title, dates, original price, store link |
+| ✅ | **Discount deals grid** — cover, title, discount %, prices, store link |
+| ✅ | **Free games grid** — cover, title, dates, original price, store link |
 | ✅ | **History archive** — grouped by ISO week, horizontal cards, one per line |
 | ✅ | **Fully responsive** for mobile / tablet |
 | ✅ | **Debug panel** with API test buttons |
@@ -152,12 +153,13 @@ services:
 
 Swagger docs at **http://localhost:8080/docs**.
 
-### Free games & history
+### Deals & free games
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/health` | GET | Health check (includes next-run time) |
 | `/api/free-games` | GET | Current + upcoming free games with cover, dates, prices, store links |
+| `/api/promotions` | GET | Current store discounts with cover, title, discount %, prices, store links |
 | `/api/history` | GET | Claim history (last 200 records) |
 | `/api/history/latest` | GET | Latest history entry |
 

@@ -39,6 +39,10 @@ EPIC_FREE_GAMES = "https://store-site-backend-static.ak.epicgames.com/freeGamesP
 EPIC_PURCHASE_ORDER = "https://www.epicgames.com/store/purchase"
 EPIC_CHECKOUT_ORDER = "https://payment-website-pci.ol.epicgames.com/purchase/confirm-order"
 
+# Checkout URL generation (from claabs/epicgames-freegames-node)
+EPIC_CLIENT_ID = "875a3b57d3a640a6b7f9b4e883463ab4"
+EPIC_ID_LOGIN_ENDPOINT = "https://www.epicgames.com/id/login"
+
 # 游戏封面图片
 EPIC_IMAGE_BASE = "https://cdn1.epicgames.com/offer"
 
@@ -102,6 +106,24 @@ class DeviceAuthCredentials:
 # ============================================
 
 @dataclass
+class PromotionGame:
+    """促销游戏"""
+    title: str
+    url: str
+    offer_id: str
+    image_url: str = ""          # 游戏封面 URL
+    description: str = ""        # 游戏描述
+    namespace: str = ""          # Epic namespace
+    original_price: str = ""     # 原价（当前标价）
+    current_price: str = ""      # 当前促销价
+    discount_percent: int = 0    # 折扣百分比
+    original_price_cents: int = 0
+    current_price_cents: int = 0
+    lowest_price: str = ""       # 历史最低价
+    lowest_price_cents: int = 0
+
+
+@dataclass
 class FreeGame:
     """免费游戏"""
     title: str
@@ -114,6 +136,7 @@ class FreeGame:
     description: str = ""        # 游戏描述
     namespace: str = ""          # Epic namespace
     checkout_url: str = ""       # 领取链接 (如未领取)
+    already_owned: bool = False  # 是否已拥有
     start_date: str = ""         # 免费开始日期
     end_date: str = ""           # 免费结束日期
     original_price: str = ""     # 原价
@@ -501,6 +524,138 @@ class EpicAPIClient:
         return None
 
     # ============================================
+    # 促销游戏 API
+    # ============================================
+
+    @staticmethod
+    def _load_low_prices() -> Dict[str, Dict]:
+        """从本地 low_prices.json 加载历史最低价数据"""
+        import json
+        import os
+        low_file = "/app/data/low_prices.json"
+        if os.path.exists(low_file):
+            try:
+                with open(low_file, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                pass
+        return {}
+
+    def _parse_promotion_game(self, item: dict, low_prices: Dict) -> Optional[PromotionGame]:
+        """从 Epic API 返回的 item 提取 PromotionGame"""
+        items_arr = item.get("items") or []
+        if not items_arr or not items_arr[0].get("id"):
+            return None
+
+        offer_id_short = items_arr[0]["id"]
+        namespace = items_arr[0].get("namespace", "")
+        offer_id = f"{namespace}/{offer_id_short}"
+        title = item.get("title", "Unknown")
+
+        slug = ""
+        offer_mappings = item.get("offerMappings") or []
+        if offer_mappings and offer_mappings[0].get("pageSlug"):
+            slug = offer_mappings[0]["pageSlug"]
+        if not slug:
+            slug = item.get("productSlug") or item.get("urlSlug") or offer_id_short
+        url = f"https://store.epicgames.com/zh-CN/p/{slug}" if slug else ""
+
+        # 封面图
+        image_url = ""
+        key_images = item.get("keyImages") or []
+        for img in key_images:
+            if img.get("type") in ("Thumbnail", "DieselStoreFrontWide", "OfferImageWide", "VaultClosed"):
+                image_url = img.get("url", "")
+                if img.get("type") == "Thumbnail":
+                    break
+        if not image_url and key_images:
+            image_url = key_images[0].get("url", "")
+
+        description = item.get("description", "") or item.get("shortDescription", "")
+
+        price = item.get("price", {}).get("totalPrice", {}) or {}
+        discount_price = price.get("discountPrice", 0)
+        original_price_cents = price.get("originalPrice", 0)
+        discount = price.get("discount", 0)
+        fmt_price = price.get("fmtPrice", {}) or {}
+        original_price = fmt_price.get("originalPrice", "")
+        current_price = fmt_price.get("discountPrice", "")
+
+        # 计算折扣百分比
+        discount_percent = 0
+        if original_price_cents > 0:
+            discount_percent = round(discount / original_price_cents * 100)
+
+        # 查找历史最低价
+        lowest_price_cents = 0
+        lowest_price = ""
+        # 用 title 作为 key 查找
+        for key, data in low_prices.items():
+            # 尝试精确匹配或标题中包含
+            if key.lower() in title.lower() or title.lower().startswith(key.lower()):
+                lowest_price_cents = data.get("lowest_price", 0)
+                lowest_price = data.get("lowest_price_formatted", "")
+                break
+
+        return PromotionGame(
+            title=title,
+            url=url,
+            offer_id=offer_id,
+            image_url=image_url,
+            description=description,
+            namespace=namespace,
+            original_price=original_price,
+            current_price=current_price,
+            discount_percent=discount_percent,
+            original_price_cents=original_price_cents,
+            current_price_cents=discount_price,
+            lowest_price=lowest_price,
+            lowest_price_cents=lowest_price_cents,
+        )
+
+    async def fetch_promotions(self) -> List[PromotionGame]:
+        """获取当前正在促销（打折）的游戏列表（非免费）
+
+        Returns:
+            当前打折的游戏列表（排除免费游戏）
+        """
+        try:
+            resp = await self.client.get(
+                EPIC_FREE_GAMES,
+                params={"locale": "zh-CN", "country": "CN", "allowCountries": "CN"},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            games = []
+
+            low_prices = self._load_low_prices()
+
+            for item in data.get("data", {}).get("Catalog", {}).get("searchStore", {}).get("elements", []):
+                # 仅处理 BASE_GAME
+                if item.get("offerType") != "BASE_GAME":
+                    continue
+
+                price = item.get("price", {}).get("totalPrice", {}) or {}
+                discount_price = price.get("discountPrice", 0)
+                original_price_cents = price.get("originalPrice", 0)
+
+                # 必须是打折的（有折扣且不是免费）
+                if discount_price <= 0 or discount_price >= original_price_cents:
+                    continue
+
+                game = self._parse_promotion_game(item, low_prices)
+                if game:
+                    games.append(game)
+
+            # 按折扣幅度排序
+            games.sort(key=lambda g: g.discount_percent, reverse=True)
+            logger.info("获取到 %d 款促销游戏", len(games))
+            return games
+        except Exception as e:
+            logger.exception("获取促销游戏失败")
+            return []
+
+    # ============================================
     async def fetch_free_games_with_status(
         self, credentials: Optional[DeviceAuthCredentials] = None,
     ) -> Tuple[List[FreeGame], List[FreeGame], Dict[str, Any]]:
@@ -567,3 +722,28 @@ class EpicAPIClient:
             "needs_manual",
             f"请前往浏览器领取：<a href='{login_redirect_url}' target='_blank'>{game.title}</a>",
         )
+
+    def _build_checkout_url(self, game: FreeGame) -> str:
+        """生成 Epic Games checkout URL + login redirect
+
+        参考：claabs/epicgames-freegames-node 的 generateCheckoutUrl
+
+        Args:
+            game: FreeGame 对象，需要 offer_id 和 namespace
+
+        Returns:
+            完整的 login redirect URL
+        """
+        # 构建 offers 参数: &offers=1-{namespace}-{offer_id}
+        offers_params = f"&offers=1-{game.namespace}-{game.offer_id}"
+        # 构建 checkout URL
+        checkout_url = f"{EPIC_PURCHASE_ORDER}?highlightColor=0078f2{offers_params}&orderId&purchaseToken&showNavigation=true"
+        # 包装为 login redirect URL
+        # 使用 urllib.parse 构建查询参数
+        from urllib.parse import urlencode, urljoin
+        params = urlencode({
+            "noHostRedirect": "true",
+            "redirectUrl": checkout_url,
+            "client_id": EPIC_CLIENT_ID,
+        })
+        return f"{EPIC_ID_LOGIN_ENDPOINT}?{params}"
