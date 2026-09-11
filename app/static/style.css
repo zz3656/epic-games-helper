@@ -713,10 +713,10 @@ code {
     border: 1px solid rgba(46, 204, 113, 0.4);
 }
 
-/* ============ 历史赠送游戏（网格布局，和免费游戏一致）============ */
+/* ============ 历史赠送游戏（横向排列，一排4个）============ */
 .weekly-history-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(4, 1fr);
     gap: 16px;
     margin-top: 16px;
 }
