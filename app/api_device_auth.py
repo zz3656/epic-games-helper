@@ -13,7 +13,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel
 
-from app.epic_api import EpicAPIClient, EPIC_ENTITLEMENTS_URL
+from app.epic_api import EpicAPIClient
 
 logger = logging.getLogger(__name__)
 

@@ -115,10 +115,6 @@ async def health():
             "timezone": config.timezone,
             "next_run": scheduler.get_next_run_time(),
         },
-        "auto_claim_enabled": scheduler.auto_claim_enabled,
-        "device_auth_configured": cred_store.has_device_auth(),
-        "notify_enabled": scheduler.notifier.enabled,
-        "notify_type": scheduler.notifier.type if scheduler.notifier.enabled else None,
     }
 
 
