@@ -58,6 +58,8 @@ class ClaimScheduler:
         self._last_fingerprint: Optional[str] = None
         # 上一周的 fingerprint（从 history.json 加载）
         self._previous_fingerprint: Optional[str] = None
+        # 已写入历史的当前周（避免重复写入）
+        self._last_week_id: Optional[str] = None
 
     def start(self):
         day = DAY_MAP.get(self.config.schedule_day, "fri")
@@ -143,16 +145,17 @@ class ClaimScheduler:
                             "(games=%s)",
                             [g.title for g in games],
                         )
-                        # 仍然写入历史（保持最新的 end_date 等信息）
-                        self._record_to_history(games, upcoming, notified=False)
                         return
 
                     logger.info(
                         "🆕 检测到新的免费游戏（或游戏列表变化）"
                     )
 
-                    # 3. 写入历史记录
-                    self._record_to_history(games, upcoming, notified=True)
+                    # 3. 写入历史记录（仅当不是同一周时写入）
+                    week_id = datetime.now().strftime("%Y-W%V")
+                    if week_id != self._last_week_id:
+                        self._record_to_history(games, upcoming, notified=True)
+                        self._last_week_id = week_id
 
                     # 4. 推送通知（仅当有 webhook 时）
                     if self.notifier.enabled:
@@ -189,7 +192,7 @@ class ClaimScheduler:
     def _load_previous_fingerprint(self) -> Optional[str]:
         """从 history.json 加载上一次的游戏 fingerprint
 
-        查找最新一条"通知已发送"的记录（success=True 且 notified=True）
+        查找最新一条 notified=True 的记录，同时获取其 week_id。
         """
         try:
             history_file = Path(self.store.file_path)
@@ -198,7 +201,6 @@ class ClaimScheduler:
             with open(history_file, "r", encoding="utf-8") as f:
                 records = json.load(f)
 
-            # 找最新一条 notified=True 的记录
             for record in reversed(records):
                 if record.get("notified") and record.get("games"):
                     games = record.get("games", [])
@@ -207,6 +209,9 @@ class ClaimScheduler:
                         if ids:
                             raw = "|".join(ids)
                             logger.info("从历史加载上一次 fingerprint：%d 款游戏", len(ids))
+                            week_id = record.get("week_id")
+                            if week_id:
+                                self._last_week_id = week_id
                             return hashlib.md5(raw.encode()).hexdigest()
             return None
         except Exception as e:
