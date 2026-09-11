@@ -214,11 +214,14 @@ class ClaimScheduler:
             return None
 
     def _record_to_history(self, games, upcoming, notified: bool):
-        """把本周免费游戏 + 下周预告写入 history.json"""
+        """把本周免费游戏（含下周预告）写入 history.json
+
+        只保存游戏清单数据，不保存状态/消息（因为我们不自动领取，状态无意义）。
+        """
         started_at = datetime.now().isoformat(timespec="seconds")
         finished_at = started_at
 
-        # 把 FreeGame 转 dict（保留 offer_id 等关键字段）
+        # 把 FreeGame 转 dict
         games_data = []
         for g in games:
             games_data.append({
@@ -230,8 +233,6 @@ class ClaimScheduler:
                 "image_url": g.image_url,
                 "end_date": g.end_date,
                 "original_price": g.original_price,
-                "status": "available",  # 标记为可领取
-                "message": "请前往 Epic 商店领取",
             })
 
         upcoming_data = []
@@ -245,8 +246,6 @@ class ClaimScheduler:
                 "image_url": u.image_url,
                 "end_date": u.end_date,
                 "original_price": u.original_price,
-                "status": "upcoming",
-                "message": "下周免费",
             })
 
         # 直接构造 dict 写入 history.json（不通过 ClaimResult，避免 dataclass 限制）
@@ -257,9 +256,9 @@ class ClaimScheduler:
             "started_at": started_at,
             "finished_at": finished_at,
             "screenshot_path": None,
-            "notified": notified,  # 标记是否已发送通知（用于下次 fingerprint 比较）
-            "type": "weekly_check",  # 区分于 claim_now / auto_claim
-            "week_id": datetime.now().strftime("%Y-W%V"),  # ISO week
+            "notified": notified,
+            "type": "weekly_check",
+            "week_id": datetime.now().strftime("%Y-W%V"),
             "games": games_data,
             "upcoming_games": upcoming_data,
         }

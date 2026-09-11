@@ -142,8 +142,8 @@ async function loadWeeklyHistory() {
         if (items.length === 0) {
             weeklyHistoryGrid.innerHTML = `<div class="empty-state">
                 <div class="empty-state-icon">📜</div>
-                <div>暂无记录</div>
-                <div class="mt-1 text-muted" style="font-size:12px;">等定时任务检测到本周免费游戏后即自动记录</div>
+                <div>暂无历史赠送</div>
+                <div class="mt-1 text-muted" style="font-size:12px;">定时任务检测到免费游戏变化后即自动记录</div>
             </div>`;
             return;
         }
@@ -194,7 +194,7 @@ function groupByWeek(items) {
 
 function renderWeeklyGroups(groups) {
     return groups.map(g => {
-        // 收集这一周所有领取过的游戏（严格按 offer_id 去重）
+        // 收集这一周所有赠送游戏（严格按 offer_id 去重）
         const seen = new Set();
         const games = [];
         for (const item of g.items) {
@@ -208,8 +208,6 @@ function renderWeeklyGroups(groups) {
                     image_url: game.image_url || "",
                     end_date: game.end_date || "",
                     original_price: game.original_price || "",
-                    status: game.status || "",
-                    message: game.message || "",
                     offer_id: game.offer_id || "",
                     week_started_at: item.started_at,
                 });
@@ -238,9 +236,9 @@ function getInitial(title) {
     return title.trim().charAt(0).toUpperCase() || "🎮";
 }
 
-// 渲染每周记录中的游戏（水平列表卡片）
+// 渲染历史赠送游戏（水平列表卡片）
+// 只展示游戏清单：封面、标题、免费时段、原价，不展示状态
 function renderHistoryCard(game) {
-    const statusInfo = getHistoryStatusInfo(game.status);
     const initial = getInitial(game.title);
 
     // 封面：优先用图片，失败/缺失时用首字占位
@@ -248,26 +246,22 @@ function renderHistoryCard(game) {
         ? `<img class="history-cover" src="${escapeHtml(game.image_url)}" alt="${escapeHtml(game.title)}" loading="lazy" onerror="this.outerHTML='<div class="history-cover-placeholder">${escapeHtml(initial)}</div>'">`
         : `<div class="history-cover-placeholder">${escapeHtml(initial)}</div>`;
 
-    // 第一行：标题 + 状态
+    // 第一行：标题
     const row1 = `
         <div class="history-row1">
             <h3 class="history-title">${escapeHtml(game.title)}</h3>
-            <span class="history-status ${statusInfo.cls}">${statusInfo.icon} ${statusInfo.label}</span>
         </div>
     `;
 
-    // 第二行：日期 + 价格 + 赠送时间
+    // 第二行：免费时段 + 原价
     const row2Parts = [];
     if (game.end_date) {
         row2Parts.push(`<span class="meta-item">🆓 ${escapeHtml(formatDates(game.week_started_at, game.end_date))}</span>`);
     }
     if (game.original_price) {
-        row2Parts.push(`<span class="meta-item"><span class="original">${escapeHtml(game.original_price)}</span><span class="free">免费</span></span>`);
+        row2Parts.push(`<span class="meta-item"><span class="original">${escapeHtml(game.original_price)}</span> → 免费</span>`);
     }
-    if (game.week_started_at) {
-        row2Parts.push(`<span class="meta-item">📅 ${escapeHtml(formatGrantDate(game.week_started_at))}</span>`);
-    }
-    const row2 = `<div class="history-row2">${row2Parts.join("")}</div>`;
+    const row2 = row2Parts.length > 0 ? `<div class="history-row2">${row2Parts.join("")}</div>` : "";
 
     // 整个卡片是可点击的链接
     if (game.url) {
@@ -285,29 +279,4 @@ function renderHistoryCard(game) {
             <div class="history-info">${row1}${row2}</div>
         </div>
     `;
-}
-
-// 状态映射
-function getHistoryStatusInfo(status) {
-    const map = {
-        "available":     { icon: "🆕", label: "待领取",  cls: "owned" },
-        "upcoming":      { icon: "📅", label: "下周",    cls: "upcoming" },
-        "claimed":       { icon: "✅", label: "已领取",  cls: "success" },
-        "already_claimed":{ icon: "🔁", label: "已拥有",  cls: "owned" },
-        "needs_manual":  { icon: "👉", label: "待手动",  cls: "manual" },
-        "pending":       { icon: "⏳", label: "处理中",  cls: "manual" },
-        "failed":        { icon: "❌", label: "失败",    cls: "failed" },
-    };
-    return map[status] || { icon: "🎯", label: status || "未知", cls: "manual" };
-}
-
-// 格式化赠送日期 (ISO → "9月10日 14:30")
-function formatGrantDate(iso) {
-    if (!iso) return "未知";
-    try {
-        const d = new Date(iso);
-        return `${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-    } catch {
-        return iso;
-    }
 }

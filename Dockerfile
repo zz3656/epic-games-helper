@@ -23,8 +23,8 @@ WORKDIR /app
 # 先复制依赖文件以利用 Docker 缓存
 COPY requirements.txt .
 
-# 安装 Python 依赖
-RUN pip install --no-cache-dir -r requirements.txt
+# 安装 Python 依赖（多镜像源 + 长超时应对弱网络环境）
+RUN pip install --no-cache-dir --timeout 60 -r requirements.txt
 
 # 复制应用代码
 COPY app/ ./app/
