@@ -60,7 +60,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     weeklyPromoSection.hidden = false;
     weeklyHistorySection.hidden = false;
     await loadWeeklyFreeGames();
-    await loadPromotions();
+    // 促销加载改为非阻塞，避免 Epic API 慢导致历史加载被卡住
+    loadPromotions().catch(() => {});
     await loadWeeklyHistory();
     // 封面和价格映射会由 loadWeeklyHistory 内的 loadCoverMap + loadPriceMap 并行加载
     // 封面映射会由 loadWeeklyHistory 内的 loadCoverMap 并行加载
