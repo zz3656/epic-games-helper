@@ -48,7 +48,6 @@ class ClaimScheduler:
         self.config = config
         self.store = store
         self.user_store = user_store  # 用户存储（多租户推送）
-        self.auto_claim_enabled = auto_claim_enabled  # 已废弃，保留仅为兼容
         self.scheduler = AsyncIOScheduler(timezone=config.timezone)
         self._lock = asyncio.Lock()
         self.notifier = Notifier()
