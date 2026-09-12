@@ -1,0 +1,38 @@
+{
+    "them's fightin' herds": {
+        "lowest_price": "¥12.00",
+        "lowest_price_cents": 1200
+    },
+    "model builder: complete edition": {
+        "lowest_price": "¥9.00",
+        "lowest_price_cents": 900
+    },
+    "eternal threads": {
+        "lowest_price": "¥12.00",
+        "lowest_price_cents": 1200
+    },
+    "ghostrunner 2": {
+        "lowest_price": "¥29.99",
+        "lowest_price_cents": 2999
+    },
+    "lost castle": {
+        "lowest_price": "¥6.00",
+        "lowest_price_cents": 600
+    },
+    "monument valley": {
+        "lowest_price": "¥3.99",
+        "lowest_price_cents": 399
+    },
+    "luftrausers": {
+        "lowest_price": "¥12.00",
+        "lowest_price_cents": 1200
+    },
+    "astral ascent": {
+        "lowest_price": "¥12.00",
+        "lowest_price_cents": 1200
+    },
+    "shogun showdown": {
+        "lowest_price": "¥15.00",
+        "lowest_price_cents": 1500
+    }
+}

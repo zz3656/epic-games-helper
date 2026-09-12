@@ -15,10 +15,16 @@ env/
 # ⚠️ 敏感配置（绝对不要提交）
 .env
 *.key
-data/
+
+# ⚠️ 用户敏感数据（不要提交包含密码/token的文件）
+data/users.json
+data/device_auth.enc
+
+# 运行时备份文件
+logs/*.bak
+logs/*.bak*
 
 # 运行时数据
-logs/*.json
 screenshots/
 *.log
 

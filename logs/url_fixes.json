@@ -1,0 +1,142 @@
+{
+  "Evan's Remains": {
+    "old_url": "https://store.epicgames.com/zh-CN/p/evan's-remains",
+    "old_slug": "evan's-remains",
+    "new_url": "https://store.epicgames.com/zh-CN/p/evans-remains",
+    "new_slug": "evans-remains",
+    "source": "egdata offerMappings.pageSlug"
+  },
+  "Cardpocalypse Standard Edition": {
+    "old_url": "https://store.epicgames.com/zh-CN/p/cardpocalypsegeneralaudience",
+    "old_slug": "cardpocalypsegeneralaudience",
+    "new_url": "https://store.epicgames.com/zh-CN/p/cardpocalypse",
+    "new_slug": "cardpocalypse",
+    "source": "egdata offerMappings.pageSlug"
+  },
+  "RollerCoaster Tycoon 3 Complete Edition": {
+    "old_url": "https://store.epicgames.com/zh-CN/p/mainegeneralaudience",
+    "old_slug": "mainegeneralaudience",
+    "new_url": "https://store.epicgames.com/zh-CN/p/rollercoaster-tycoon-3-complete-edition",
+    "new_slug": "rollercoaster-tycoon-3-complete-edition",
+    "source": "egdata offerMappings.pageSlug"
+  },
+  "Teenage Mutant Ninja Turtles - Shredder's Revenge": {
+    "old_url": "https://store.epicgames.com/zh-CN/p/teenage-mutant-ninja-turtles---shredder's-revenge",
+    "old_slug": "teenage-mutant-ninja-turtles---shredder's-revenge",
+    "new_url": "https://store.epicgames.com/zh-CN/p/teenage-mutant-ninja-turtles-shredders-revenge",
+    "new_slug": "teenage-mutant-ninja-turtles-shredders-revenge",
+    "source": "egdata offerMappings.pageSlug"
+  },
+  "Broken Sword : Reforged": {
+    "old_url": "https://store.epicgames.com/zh-CN/p/broken-sword--reforged",
+    "old_slug": "broken-sword--reforged",
+    "new_url": "https://store.epicgames.com/zh-CN/p/broken-sword-reforged-android-6a7c91",
+    "new_slug": "broken-sword-reforged-android-6a7c91",
+    "source": "egdata offerMappings.pageSlug"
+  },
+  "Dumb Ways to Die 2: The Games": {
+    "old_url": "https://store.epicgames.com/zh-CN/p/dumb-ways-to-die-2-the-games",
+    "old_slug": "dumb-ways-to-die-2-the-games",
+    "new_url": "https://store.epicgames.com/zh-CN/p/dumb-ways-to-die-2-ios-2c123d",
+    "new_slug": "dumb-ways-to-die-2-ios-2c123d",
+    "source": "egdata offerMappings.pageSlug"
+  },
+  "Beholder: Conductor": {
+    "old_url": "https://store.epicgames.com/zh-CN/p/beholder-conductor",
+    "old_slug": "beholder-conductor",
+    "new_url": "https://store.epicgames.com/zh-CN/p/beholder-conductor-android-fb38c4",
+    "new_slug": "beholder-conductor-android-fb38c4",
+    "source": "egdata offerMappings.pageSlug"
+  },
+  "A Guidebook Of Babel": {
+    "old_url": "https://store.epicgames.com/zh-CN/p/a-guidebook-of-babel",
+    "old_slug": "a-guidebook-of-babel",
+    "new_url": "https://store.epicgames.com/zh-CN/p/a-guidebook-of-babel-ios-31c4fd",
+    "new_slug": "a-guidebook-of-babel-ios-31c4fd",
+    "source": "egdata offerMappings.pageSlug"
+  },
+  "Princess Farmer": {
+    "old_url": "https://store.epicgames.com/zh-CN/p/princess-farmer",
+    "old_slug": "princess-farmer",
+    "new_url": "https://store.epicgames.com/zh-CN/p/princess-farmer-android-09215e",
+    "new_slug": "princess-farmer-android-09215e",
+    "source": "egdata offerMappings.pageSlug"
+  },
+  "Sophia the Traveler": {
+    "old_url": "https://store.epicgames.com/zh-CN/p/sophia-the-traveler",
+    "old_slug": "sophia-the-traveler",
+    "new_url": "https://store.epicgames.com/zh-CN/p/sophia-the-traveler-android-d6e23d",
+    "new_slug": "sophia-the-traveler-android-d6e23d",
+    "source": "egdata offerMappings.pageSlug"
+  },
+  "Construction Simulator 3": {
+    "old_url": "https://store.epicgames.com/zh-CN/p/construction-simulator-3",
+    "old_slug": "construction-simulator-3",
+    "new_url": "https://store.epicgames.com/zh-CN/p/construction-simulator-3-android-761575",
+    "new_slug": "construction-simulator-3-android-761575",
+    "source": "egdata offerMappings.pageSlug"
+  },
+  "Monument Valley 3": {
+    "old_url": "https://store.epicgames.com/zh-CN/p/monument-valley-3",
+    "old_slug": "monument-valley-3",
+    "new_url": "https://store.epicgames.com/zh-CN/p/monument-valley-3-android-c7433e",
+    "new_slug": "monument-valley-3-android-c7433e",
+    "source": "egdata offerMappings.pageSlug"
+  },
+  "Streets of Rage 4": {
+    "old_url": "https://store.epicgames.com/zh-CN/p/streets-of-rage-4",
+    "old_slug": "streets-of-rage-4",
+    "new_url": "https://store.epicgames.com/zh-CN/p/streets-of-rage-4-android-b10fcc",
+    "new_slug": "streets-of-rage-4-android-b10fcc",
+    "source": "egdata offerMappings.pageSlug"
+  },
+  "911 Operator": {
+    "old_url": "https://store.epicgames.com/zh-CN/p/911-operator",
+    "old_slug": "911-operator",
+    "new_url": "https://store.epicgames.com/zh-CN/p/911-operator-android-81a414",
+    "new_slug": "911-operator-android-81a414",
+    "source": "egdata offerMappings.pageSlug"
+  },
+  "Dumb Ways to Draw": {
+    "old_url": "https://store.epicgames.com/zh-CN/p/dumb-ways-to-draw",
+    "old_slug": "dumb-ways-to-draw",
+    "new_url": "https://store.epicgames.com/zh-CN/p/dumb-ways-to-draw-android-3bce1a",
+    "new_slug": "dumb-ways-to-draw-android-3bce1a",
+    "source": "egdata offerMappings.pageSlug"
+  },
+  "Little Nightmares": {
+    "old_url": "https://store.epicgames.com/zh-CN/p/little-nightmares",
+    "old_slug": "little-nightmares",
+    "new_url": "https://store.epicgames.com/zh-CN/p/little-nightmares-android-9ac815",
+    "new_slug": "little-nightmares-android-9ac815",
+    "source": "egdata offerMappings.pageSlug"
+  },
+  "Residual": {
+    "old_url": "https://store.epicgames.com/zh-CN/p/residual",
+    "old_slug": "residual",
+    "new_url": "https://store.epicgames.com/zh-CN/p/residual-android-eef593",
+    "new_slug": "residual-android-eef593",
+    "source": "egdata offerMappings.pageSlug"
+  },
+  "Faily Brakes 2": {
+    "old_url": "https://store.epicgames.com/zh-CN/p/faily-brakes-2",
+    "old_slug": "faily-brakes-2",
+    "new_url": "https://store.epicgames.com/zh-CN/p/faily-brakes-2-android-a5e0d1",
+    "new_slug": "faily-brakes-2-android-a5e0d1",
+    "source": "manual"
+  },
+  "The Forest Quartet": {
+    "old_url": "https://store.epicgames.com/zh-CN/p/the-forest-quartet",
+    "old_slug": "the-forest-quartet",
+    "new_url": "https://store.epicgames.com/zh-CN/p/forest-quartet-android-eb07b9",
+    "new_slug": "forest-quartet-android-eb07b9",
+    "source": "egdata offerMappings.pageSlug"
+  },
+  "Bouncemasters": {
+    "old_url": "https://store.epicgames.com/zh-CN/p/bouncemasters",
+    "old_slug": "bouncemasters",
+    "new_url": "https://store.epicgames.com/zh-CN/p/bouncemasters-ios-e86970",
+    "new_slug": "bouncemasters-ios-e86970",
+    "source": "egdata offerMappings.pageSlug"
+  }
+}

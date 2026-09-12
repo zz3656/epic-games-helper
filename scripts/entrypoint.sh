@@ -79,6 +79,25 @@ else
 fi
 
 # ============================================
+# 初始化用户数据存储
+# ============================================
+USER_STORE_PATH="/app/data/users.json"
+
+if [ ! -f "$USER_STORE_PATH" ]; then
+    echo "[INFO] users.json not found, creating empty user store..."
+    python3 -c "
+import json, os
+os.makedirs('/app/data', exist_ok=True)
+data = {'users': []}
+with open('/app/data/users.json', 'w') as f:
+    json.dump(data, f, ensure_ascii=False, indent=2)
+" &
+    echo "[INFO] Empty users.json created at ${USER_STORE_PATH}"
+else
+    echo "[INFO] Using existing users.json"
+fi
+
+# ============================================
 # 启动 uvicorn
 # ============================================
 exec python -m uvicorn app.main:app --host 0.0.0.0 --port 8080
