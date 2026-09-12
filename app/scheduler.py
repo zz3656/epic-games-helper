@@ -320,10 +320,10 @@ class ClaimScheduler:
 
         # 标题：🎮 Epic 本周免费游戏
         title = f"🎮 Epic 本周 {len(games)} 款免费游戏"
-        # 正文
+        # 正文：包含截止日期和每个游戏的原价
         lines = [f"📅 本周免费领取（截至 {games[0].end_date[:10] if games[0].end_date else '本周结束'}）"]
         for g in games:
-            price_part = f" {g.original_price} → 免费" if g.original_price else ""
+            price_part = f" `({g.original_price}→免费)`" if g.original_price else ""
             lines.append(f"• {g.title}{price_part}")
         if upcoming:
             lines.append("")
