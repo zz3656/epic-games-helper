@@ -2,7 +2,7 @@
 
 > **本周促销 · 免费游戏 · 历史赠送清单 · 零依赖。**
 >
-> 追踪 Epic 商店打折与免费游戏 · 记录历史赠送清单 · 零登录 · 零验证码 · 镜像 ~150MB。
+> 追踪 Epic 商店打折与免费游戏 · 记录历史赠送清单 · 用户认证 & 通知推送 · 镜像 ~150MB。
 
 🇺🇸 [English README](README.md)
 
@@ -17,8 +17,10 @@
 - 📅 **预告** 下周即将免费的 Epic 游戏
 - 🗂️ **记录** 每周赠送过的游戏（永久历史，按周分组）
 - 🎯 **跳转 Epic 商店** — 点击直达 Epic 商品页
+- 👤 **用户账户** — 注册、登录、配置个人推送渠道
+- 📲 **Webhook 推送** — 通过 Bark、Server 酱、PushPlus、Telegram Bot 或自定义 Webhook 通知
 
-> **无需登录。** 免费游戏和促销数据来自 Epic 公开 API，不需要任何账号授权。
+> **浏览无需登录。** 免费游戏和促销数据来自 Epic 公开 API。登录是可选的 — 仅在需要推送通知时使用。
 
 ---
 
@@ -59,6 +61,22 @@
 | ✅ | **Fingerprint 对比** — 游戏变化时才写入历史 |
 | ✅ | **下次运行时间** 在 health API 中返回 |
 
+### 多用户 & 通知推送
+
+| 状态 | 功能 |
+|------|------|
+| ✅ | **用户注册 & 登录** — JWT 认证，数据存于 `data/users.json` |
+| ✅ | **独立推送配置** — 每个用户可配置自己的通知渠道 |
+| ✅ | **Webhook 推送** — 检测到新免费游戏时推送，支持 5 种渠道： |
+| | &nbsp;&nbsp;&nbsp;&nbsp;• **Bark**（iOS 推送） |
+| | &nbsp;&nbsp;&nbsp;&nbsp;• **Server 酱**（微信） |
+| | &nbsp;&nbsp;&nbsp;&nbsp;• **PushPlus**（微信/钉钉/飞书/邮件） |
+| | &nbsp;&nbsp;&nbsp;&nbsp;• **Telegram Bot**（群组/频道） |
+| | &nbsp;&nbsp;&nbsp;&nbsp;• **通用 Webhook**（自定义 POST JSON） |
+| ✅ | **全局 + 用户推送** — 同时支持全局（`NOTIFY_WEBHOOK_*`）和每个用户的推送渠道 |
+| ✅ | **测试推送** — 可在 UI 中测试推送配置是否正确 |
+| ✅ | **退出登录** — 可在 UI 中退出 |
+
 ### 基础设施
 
 | 状态 | 功能 |
@@ -74,7 +92,7 @@
 | 状态 | 功能 | 原因 |
 |------|------|------|
 | ❌ | 真正零点击自动领取 | Epic 需要浏览器 session cookie、XSRF token、hCaptcha — 无法通过 API 伪造 |
-| ❌ | 账号登录 / 设备码授权 | 不需要 — 免费游戏数据是公开的，没有 entitlements 查询 |
+| ❌ | 设备码授权 / 自动领取 | 不需要 — 免费游戏数据是公开的；设备码授权和自动领取不在此项目范围内 |
 | ❌ | 完整游戏库 | Epic `library-service` API 需要 OAuth authorization_code flow，Epic 不允许 localhost redirect_uri |
 
 ---
@@ -168,6 +186,18 @@ Swagger 文档：**http://localhost:8080/docs**
 |------|------|------|
 | `/api/scheduler/test-run` | POST | 手动触发定时检查（调试用）|
 
+### 用户认证
+
+| 接口 | 方法 | 说明 |
+|------|------|------|
+| `/api/auth/register` | POST | 注册用户 |
+| `/api/auth/login` | POST | 登录（返回 JWT token）|
+| `/api/auth/logout` | POST | 登出 |
+| `/api/auth/me` | GET | 获取当前用户信息 |
+| `/api/auth/push-config` | GET | 获取当前用户推送配置 |
+| `/api/auth/push-config` | PUT | 更新推送配置 |
+| `/api/auth/test-push` | POST | 测试推送 |
+
 ---
 
 ## 🏗️ 架构
@@ -178,6 +208,8 @@ Swagger 文档：**http://localhost:8080/docs**
 │  • Epic 风格（纯黑 + #0078F2）                            │
 │  • 本周免费游戏网格                                       │
 │  • 历史赠送清单（按周分组）                               │
+│  • 登录/注册弹窗                                          │
+│  • 推送设置弹窗（用户独立渠道配置）                        │
 │  • 调试面板 + API 测试按钮                                │
 └────────────────────────────────────────────────────────────┘
                             ↓
@@ -186,14 +218,25 @@ Swagger 文档：**http://localhost:8080/docs**
 │  • /api/free-games             本周 + 下周游戏             │
 │  • /api/promotions             本周促销折扣                │
 │  • /api/history                领取历史                    │
+│  • /api/auth/*                 注册/登录/推送配置          │
 │  • /api/scheduler/*            手动触发                    │
 │  • APScheduler                 每周五 0:05 定时检查        │
+│  • Notifier                    Webhook 推送（多渠道）      │
+│  • UserStore                   基于 JSON 的用户存储        │
+│  • JWT Auth                    Token 认证                  │
 └────────────────────────────────────────────────────────────┘
                             ↓
 ┌────────────────────────────────────────────────────────────┐
 │  EpicAPIClient（纯 HTTP，无浏览器）                        │
 │  • searchStore (BASE_GAME + discounts)  → 促销             │
 │  • freeGamesPromotions          → 本周 + 下周游戏         │
+└────────────────────────────────────────────────────────────┘
+                            ↓
+┌────────────────────────────────────────────────────────────┐
+│  推送渠道                                                  │
+│  • Bark（iOS）/ Server 酱（微信）/ PushPlus               │
+│  • Telegram Bot / 通用 Webhook                             │
+│  • 全局 + 用户独立推送                                     │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -206,13 +249,19 @@ epic-games-helper/
 ├── app/
 │   ├── main.py                # FastAPI 入口
 │   ├── epic_api.py            # 纯 HTTP Epic 客户端（freeGamesPromotions）
-│   ├── scheduler.py           # APScheduler 定时检查 + fingerprint
+│   ├── scheduler.py           # APScheduler 定时检查 + fingerprint + 推送
+│   ├── notifier.py            # Webhook 推送（Bark / Server 酱 / PushPlus / Telegram）
 │   ├── storage.py             # 历史持久化（deque + JSON 文件）
+│   ├── user_store.py          # 用户数据存储（JSON + bcrypt）
+│   ├── auth.py                # JWT 认证模块
+│   ├── api_users.py           # 用户管理 API（登录/注册/推送配置）
 │   ├── result.py              # 数据模型
 │   ├── config.py              # 环境变量
 │   └── static/
 │       ├── device_auth.js     # 页面初始化 + 工具函数（~130 行）
 │       ├── free_games.js      # 游戏卡片渲染 + 历史（~260 行）
+│       ├── auth_core.js       # 认证核心（登录/注册弹窗）
+│       ├── auth_settings.js   # 推送设置弹窗 + 用户 UI
 │       └── style.css          # Epic 设计系统（~20 KB）
 ├── scripts/
 │   └── entrypoint.sh          # 容器入口

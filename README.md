@@ -4,7 +4,7 @@
 >
 > Track what Epic gives away each week, see your claim history, and jump to Epic's store page.
 >
-> No login. No browser. No captcha. ~150 MB image.
+> User auth & webhook notifications · per-user push channels · no browser · ~150 MB image.
 
 🇨🇳 [中文说明](README-zh-CN.md)
 
@@ -18,8 +18,10 @@
 - 📅 **Previews** next week's upcoming free games
 - 🗂️ **Records** every weekly drop into a permanent history
 - 🎯 **One-click links** to Epic's store page per game (launch directly to the product page)
+- 👤 **User accounts** — register, login, configure per-user notification channels
+- 📲 **Webhook push** — notify via Bark, Server 酱, PushPlus, Telegram Bot, or custom webhook
 
-> **No login required.** The free games list comes from Epic's public catalog API — no credentials needed.
+> **No login required to browse.** The free games list comes from Epic's public catalog API. Login is optional — needed only for push notifications.
 
 ---
 
@@ -59,6 +61,22 @@
 | ✅ | **Fingerprint comparison** — only records history when the weekly drop actually changes |
 | ✅ | **Next-run time** displayed in health API |
 
+### Multi-User & Notifications
+
+| Status | Feature |
+|--------|---------|
+| ✅ | **User registration & login** — JWT-based auth, stored in `data/users.json` |
+| ✅ | **Per-user push configuration** — each user configures their own notification channel |
+| ✅ | **Webhook push** when new free games are detected — supports 5 channels: |
+| | &nbsp;&nbsp;&nbsp;&nbsp;• **Bark** (iOS push) |
+| | &nbsp;&nbsp;&nbsp;&nbsp;• **Server 酱** (WeChat) |
+| | &nbsp;&nbsp;&nbsp;&nbsp;• **PushPlus** (WeChat / DingTalk / Feishu / Email) |
+| | &nbsp;&nbsp;&nbsp;&nbsp;• **Telegram Bot** (group/channel) |
+| | &nbsp;&nbsp;&nbsp;&nbsp;• **Generic Webhook** (custom POST JSON) |
+| ✅ | **Global + per-user push** — both global (`NOTIFY_WEBHOOK_*`) and per-user push are sent on detection |
+| ✅ | **Test push** button in UI to verify configuration |
+| ✅ | **Logout** from UI |
+
 ### Infrastructure
 
 | Status | Feature |
@@ -74,9 +92,7 @@
 | Status | Feature | Reason |
 |--------|---------|--------|
 | ❌ | True auto-claim | Epic requires browser session cookies, XSRF token, hCaptcha — cannot be forged via API |
-| ❌ | Account login | Not needed — free games data is public. No entitlements or ownership queries |
 | ❌ | Full game library | Epic's `library-service` API requires OAuth flow Epic doesn't allow for localhost |
-| ❌ | Multi-account support | Single-app design |
 
 ---
 
@@ -169,6 +185,18 @@ Swagger docs at **http://localhost:8080/docs**.
 |----------|--------|-------------|
 | `/api/scheduler/test-run` | POST | Manually trigger the weekly check (debug) |
 
+### Authentication
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/auth/register` | POST | Register a new user |
+| `/api/auth/login` | POST | Login (returns JWT token) |
+| `/api/auth/logout` | POST | Logout |
+| `/api/auth/me` | GET | Get current user info |
+| `/api/auth/push-config` | GET | Get current user's push config |
+| `/api/auth/push-config` | PUT | Update push config |
+| `/api/auth/test-push` | POST | Test push notification |
+
 ---
 
 ## 🏗️ Architecture
@@ -179,20 +207,34 @@ Swagger docs at **http://localhost:8080/docs**.
 │  • Epic-styled design (pure black + #0078F2)               │
 │  • Weekly free games grid                                  │
 │  • History archive (per-week grouping)                     │
+│  • Login / Register modal                                  │
+│  • Push settings modal (per-user channel config)           │
 │  • Debug panel + API test buttons                          │
 └────────────────────────────────────────────────────────────┘
                             ↓
 ┌────────────────────────────────────────────────────────────┐
 │  FastAPI Backend (port 8080)                               │
 │  • /api/free-games             weekly + upcoming games     │
+│  • /api/promotions             store discounts             │
 │  • /api/history                claim history               │
+│  • /api/auth/*                 register/login/push config  │
 │  • /api/scheduler/*            manual trigger              │
 │  • APScheduler                 Friday 00:05 weekly check   │
+│  • Notifier                    webhook push (multi-ctx)    │
+│  • UserStore                   JSON-based user DB          │
+│  • JWT Auth                    token-based auth            │
 └────────────────────────────────────────────────────────────┘
                             ↓
 ┌────────────────────────────────────────────────────────────┐
 │  EpicAPIClient (pure HTTP, no browser)                     │
 │  • freeGamesPromotions          → weekly + upcoming games  │
+└────────────────────────────────────────────────────────────┘
+                            ↓
+┌────────────────────────────────────────────────────────────┐
+│  Push Channels                                               │
+│  • Bark (iOS) / Server 酱 (WeChat) / PushPlus             │
+│  • Telegram Bot / Generic Webhook                          │
+│  • Global + per-user channels                              │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -205,15 +247,19 @@ epic-games-helper/
 ├── app/
 │   ├── main.py                # FastAPI entry
 │   ├── epic_api.py            # Pure HTTP Epic client (freeGamesPromotions)
-│   ├── api_device_auth.py     # (kept for backwards compat)
-│   ├── scheduler.py           # APScheduler weekly check + fingerprint
-│   ├── credential_store.py    # (kept for backwards compat)
+│   ├── scheduler.py           # APScheduler weekly check + fingerprint + push
+│   ├── notifier.py            # Webhook push (Bark / Server 酱 / PushPlus / Telegram)
 │   ├── storage.py             # History persistence (deque + JSON file)
+│   ├── user_store.py          # User data store (JSON + bcrypt)
+│   ├── auth.py                # JWT auth module
+│   ├── api_users.py           # User management API (register/login/push config)
 │   ├── result.py              # Data models
 │   ├── config.py              # Env config
 │   └── static/
 │       ├── device_auth.js     # Page init + utilities (~130 lines)
 │       ├── free_games.js      # Game card rendering + history (~260 lines)
+│       ├── auth_core.js       # Auth core (login/register modal)
+│       ├── auth_settings.js   # Push settings modal + user UI
 │       └── style.css          # Epic design system (~20 KB)
 ├── scripts/
 │   └── entrypoint.sh          # Container entry
