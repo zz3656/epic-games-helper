@@ -46,8 +46,8 @@ function createSettingsModal() {
                             4. 粘贴到下方即可
                         </div>
                         <div class="form-group">
-                            <label for="push-token">Device Key</label>
-                            <input type="text" id="push-token" placeholder="例如：ABC123def456ghi...">
+                            <label for="push-token-bark">Device Key</label>
+                            <input type="text" id="push-token-bark" placeholder="例如：ABC123def456ghi...">
                         </div>
                     </div>
 
@@ -61,8 +61,8 @@ function createSettingsModal() {
                             4. 粘贴到下方即可
                         </div>
                         <div class="form-group">
-                            <label for="push-token">SendKey</label>
-                            <input type="text" id="push-token" placeholder="例如：SCT123456...">
+                            <label for="push-token-serverchan">SendKey</label>
+                            <input type="text" id="push-token-serverchan" placeholder="例如：SCT123456...">
                         </div>
                     </div>
 
@@ -76,8 +76,8 @@ function createSettingsModal() {
                             4. Token 粘贴到下方，然后保存
                         </div>
                         <div class="form-group">
-                            <label for="push-token">Token</label>
-                            <input type="text" id="push-token" placeholder="在 PushPlus 注册的 Token">
+                            <label for="push-token-pushplus">Token</label>
+                            <input type="text" id="push-token-pushplus" placeholder="在 PushPlus 注册的 Token">
                         </div>
                         <div class="form-group">
                             <label for="push-channel">推送方式</label>
@@ -103,12 +103,12 @@ function createSettingsModal() {
                             5. Chat ID 填上方框，Bot Token 填下方框
                         </div>
                         <div class="form-group">
-                            <label for="push-token">Chat ID</label>
-                            <input type="text" id="push-token" placeholder="例如：-1001234567890">
+                            <label for="push-token-telegram">Chat ID</label>
+                            <input type="text" id="push-token-telegram" placeholder="例如：-1001234567890">
                         </div>
                         <div class="form-group">
-                            <label for="push-url">Bot Token</label>
-                            <input type="text" id="push-url" placeholder="格式：123456:ABC-DEF1234...">
+                            <label for="push-url-telegram">Bot Token</label>
+                            <input type="text" id="push-url-telegram" placeholder="格式：123456:ABC-DEF1234...">
                         </div>
                     </div>
 
@@ -125,8 +125,8 @@ function createSettingsModal() {
 }</pre>
                         </div>
                         <div class="form-group">
-                            <label for="push-url">Webhook URL</label>
-                            <input type="url" id="push-url" placeholder="https://your-server.com/epic-notify">
+                            <label for="push-url-generic">Webhook URL</label>
+                            <input type="url" id="push-url-generic" placeholder="https://your-server.com/epic-notify">
                         </div>
                     </div>
 
@@ -162,11 +162,24 @@ function createSettingsModal() {
             errorEl.style.display = 'block';
             return;
         }
+        // 根据所选渠道获取对应的 token / url 输入框
+        const tokenMap = {
+            bark: '#push-token-bark',
+            serverchan: '#push-token-serverchan',
+            pushplus: '#push-token-pushplus',
+            telegram: '#push-token-telegram',
+        };
+        const urlMap = {
+            generic: '#push-url-generic',
+            telegram: '#push-url-telegram',
+        };
+        const tokenSelector = tokenMap[pushType];
+        const urlSelector = urlMap[pushType];
         const config = {
             enabled: modal.querySelector('#push-enabled').checked,
             type: pushType,
-            token: (modal.querySelector('#push-token')?.value || '').trim(),
-            url: (modal.querySelector('#push-url')?.value || '').trim(),
+            token: (tokenSelector && modal.querySelector(tokenSelector)?.value || '').trim(),
+            url: (urlSelector && modal.querySelector(urlSelector)?.value || '').trim(),
             channel: (modal.querySelector('#push-channel')?.value || 'wechat'),
         };
         try {
@@ -178,7 +191,18 @@ function createSettingsModal() {
             if (resp.ok && data.success) {
                 showToast('推送配置已保存', 'success');
             } else {
-                errorEl.textContent = data.detail || '保存失败';
+                // 防御性处理：detail 可能是字符串、对象或数组
+                let errMsg = '';
+                if (typeof data.detail === 'string') {
+                    errMsg = data.detail;
+                } else if (Array.isArray(data.detail) && data.detail.length > 0) {
+                    errMsg = data.detail.map(e => typeof e === 'string' ? e : e.msg || e.loc?.join('.') || '').join('; ');
+                } else if (typeof data.detail === 'object' && data.detail !== null) {
+                    errMsg = JSON.stringify(data.detail);
+                } else {
+                    errMsg = data.message || '保存失败';
+                }
+                errorEl.textContent = errMsg;
                 errorEl.style.display = 'block';
             }
         } catch (err) {
@@ -197,7 +221,17 @@ function createSettingsModal() {
             if (resp.ok && data.success) {
                 showToast('测试推送已发送', 'success');
             } else {
-                errorEl.textContent = data.detail || data.message || '推送失败';
+                let errMsg = '';
+                if (typeof data.detail === 'string') {
+                    errMsg = data.detail;
+                } else if (Array.isArray(data.detail) && data.detail.length > 0) {
+                    errMsg = data.detail.map(e => typeof e === 'string' ? e : e.msg || e.loc?.join('.') || '').join('; ');
+                } else if (typeof data.detail === 'object' && data.detail !== null) {
+                    errMsg = data.message || JSON.stringify(data.detail);
+                } else {
+                    errMsg = data.message || '推送失败';
+                }
+                errorEl.textContent = errMsg;
                 errorEl.style.display = 'block';
             }
         } catch (err) {
@@ -229,10 +263,19 @@ function createSettingsModal() {
                 modal.querySelector('#push-type').value = data.type;
                 modal.querySelector('#push-type').dispatchEvent(new Event('change'));
                 if (data.type && data.has_token) {
-                    const ti = modal.querySelector('#push-token');
-                    if (ti) { ti.placeholder = '已有配置（填写将被覆盖）'; ti.required = false; }
+                    const tokenMap = {
+                        bark: '#push-token-bark',
+                        serverchan: '#push-token-serverchan',
+                        pushplus: '#push-token-pushplus',
+                        telegram: '#push-token-telegram',
+                    };
+                    const tokenSelector = tokenMap[data.type];
+                    if (tokenSelector) {
+                        const ti = modal.querySelector(tokenSelector);
+                        if (ti) { ti.placeholder = '已有配置（填写将被覆盖）'; ti.required = false; }
+                    }
                     if (data.type === 'telegram') {
-                        const ui = modal.querySelector('#push-url');
+                        const ui = modal.querySelector('#push-url-telegram');
                         if (ui) { ui.placeholder = '已有配置（填写将被覆盖）'; ui.required = false; }
                     }
                 }

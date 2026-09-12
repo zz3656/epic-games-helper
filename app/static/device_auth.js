@@ -38,8 +38,8 @@ async function fetchWithAuth(url, options = {}) {
     if (authToken) {
         headers['Authorization'] = `Bearer ${authToken}`;
     }
-    // 不重复设置 Content-Type，让浏览器自动设置（处理 JSON 序列化）
-    if (options.body && !headers['Content-Type'] && typeof options.body === 'object') {
+    // 当 body 为字符串（JSON.stringify 后的结果）或对象时，自动设置 Content-Type
+    if (options.body && !headers['Content-Type']) {
         headers['Content-Type'] = 'application/json';
     }
     return fetch(url, { ...options, headers });
