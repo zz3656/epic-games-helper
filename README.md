@@ -105,6 +105,7 @@ docker run -d \
   --name epic-helper \
   -p 8080:8080 \
   -v $(pwd)/logs:/app/logs \
+  -v $(pwd)/data:/app/data \
   --restart unless-stopped \
   zz3656/epic-games-helper:latest
 ```
@@ -124,6 +125,7 @@ docker run -d \
   --name epic-helper \
   -p 8080:8080 \
   -v $(pwd)/logs:/app/logs \
+  -v $(pwd)/data:/app/data \
   -e TZ=Asia/Shanghai \
   -e SCHEDULE_DAY=fri \
   -e SCHEDULE_HOUR=0 \
@@ -151,7 +153,8 @@ services:
       - SCHEDULE_HOUR=0
       - SCHEDULE_MINUTE=5
     volumes:
-      - ./logs:/app/logs
+      - ./logs:/app/logs       # 历史记录 + 封面映射
+      - ./data:/app/data       # 用户数据 + 配置密钥
     security_opt:
       - no-new-privileges:true
     deploy:
@@ -162,6 +165,17 @@ services:
 ```
 
 > 📌 **Multi-arch**: `linux/amd64` + `linux/arm64` (Synology, QNAP, Unraid, Raspberry Pi 4+)
+
+### 💾 Data Persistence
+
+All data is persisted to host directories via Docker volumes:
+
+| Volume | Contents |
+|--------|----------|
+| `./logs:/app/logs` | Claim history (`history.json`), cover map |
+| `./data:/app/data` | User accounts (`users.json`), `.env` config |
+
+> **Never lose your data:** As long as you keep the `./logs` and `./data` directories, your history and user accounts will survive container rebuilds and image updates.
 
 ---
 

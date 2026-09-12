@@ -49,6 +49,6 @@ jobs:
           with open('docker-compose.yml') as f:
               data = yaml.safe_load(f)
           assert 'services' in data, 'Missing services'
-          assert 'epic-claimer' in data['services'], 'Missing epic-claimer service'
+          assert 'epic-helper' in data['services'], 'Missing epic-claimer service'
           print('docker-compose.yml OK')
           "

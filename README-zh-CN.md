@@ -106,6 +106,7 @@ docker run -d \
   --name epic-helper \
   -p 8080:8080 \
   -v $(pwd)/logs:/app/logs \
+  -v $(pwd)/data:/app/data \
   --restart unless-stopped \
   zz3656/epic-games-helper:latest
 ```
@@ -126,6 +127,7 @@ docker run -d \
   --name epic-helper \
   -p 8080:8080 \
   -v $(pwd)/logs:/app/logs \
+  -v $(pwd)/data:/app/data \
   -e TZ=Asia/Shanghai \
   -e SCHEDULE_DAY=fri \
   -e SCHEDULE_HOUR=0 \
@@ -152,7 +154,8 @@ services:
       - SCHEDULE_HOUR=0
       - SCHEDULE_MINUTE=5
     volumes:
-      - ./logs:/app/logs
+      - ./logs:/app/logs       # 历史记录 + 封面映射
+      - ./data:/app/data       # 用户数据 + 配置密钥
     security_opt:
       - no-new-privileges:true
     deploy:
@@ -163,6 +166,17 @@ services:
 ```
 
 > 📌 **多架构镜像**：`linux/amd64` 和 `linux/arm64`（群晖、威联通、Unraid、Raspberry Pi 4+ 都能跑）
+
+### 💾 数据持久化
+
+所有数据通过 Docker volume 挂载到宿主机目录：
+
+| 挂载卷 | 内容 |
+|--------|------|
+| `./logs:/app/logs` | 历史记录（`history.json`）、封面映射 |
+| `./data:/app/data` | 用户数据（`users.json`）、`.env` 配置 |
+
+> **数据不会丢失：** 只要保留 `./logs` 和 `./data` 目录，重建容器或更新镜像都不会影响你的历史记录和用户数据。
 
 ---
 
