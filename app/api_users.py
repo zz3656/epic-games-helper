@@ -219,7 +219,7 @@ async def test_push(current_user: dict = Depends(require_login)):
         raise HTTPException(status_code=400, detail="请先配置并启用推送渠道")
 
     # 临时构建一个 Notifier 实例，使用用户的配置
-    notifier = Notifier()
+    notifier = Notifier(user_push_config=push_config)
     notifier.type = push_config.get("type", "")
     notifier.url = push_config.get("url", "")
     notifier.token = push_config.get("token", "")
