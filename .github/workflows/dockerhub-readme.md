@@ -1,8 +1,8 @@
-# 🎮 Epic Games Free Games Helper
+# 🎮 Epic Games Store Tracker
 
-> **Track Epic's weekly free games · history archive · no login required.**
+> **Weekly free games · current discounts · history archive · zero login.**
 >
-> Weekly free game tracker · historical gift records · pure HTTP API · ~150 MB image.
+> Track Epic Store deals — free games, promotions, and claim history. Pure HTTP API · ~150 MB image.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docker Pulls](https://img.shields.io/docker/pulls/zz3656/epic-games-helper.svg?style=flat)](https://hub.docker.com/r/zz3656/epic-games-helper)
@@ -12,19 +12,21 @@
 
 ## ⚡ What is this?
 
-`epic-games-helper` is a **lightweight HTTP API + Web UI** for tracking Epic Games weekly free games.
+`epic-games-helper` is a **lightweight HTTP API + Web UI** for tracking Epic Games Store deals.
 
-- ✅ Tracks weekly free games (Epic's public catalog API, no login needed)
-- ✅ Next-week preview (shows upcoming free games one week ahead)
-- ✅ Permanent history archive (grouped by ISO week)
-- ✅ One-click store links to Epic's product pages
-- ✅ No Chromium / Playwright / browser automation
-- ✅ Image size ~150 MB
+- 🏷️ **Discount deals** — current promotions with discount %, price comparison
+- 🎮 **Free games** — weekly free games + next week's preview
+- 📜 **History archive** — permanent record grouped by ISO week
+- 🔗 **One-click store links** — direct navigation to Epic product pages
+- 📲 **Notification** — Webhook push (Bark / PushPlus / Server 酱 / Telegram)
+- 🚫 **No login · No browser · No captcha**
+- 📦 Image size ~150 MB
 
 ## ✨ Features
 
 | Feature | Status |
 |---------|--------|
+| Discount deals tracker (current promotions) | ✅ |
 | Weekly free game tracker | ✅ |
 | Next-week preview | ✅ |
 | History archive (per-week grouping) | ✅ |
@@ -34,18 +36,11 @@
 | Fully responsive UI (mobile/tablet) | ✅ |
 | APScheduler weekly check (Fri 00:05 BJ) | ✅ |
 | Fingerprint comparison (only record on changes) | ✅ |
+| Webhook notifications (Bark/PushPlus/Server 酱/Telegram) | ✅ |
 | Multi-arch Docker image | ✅ |
 | REST API + Swagger UI | ✅ |
 | Docker Compose support | ✅ |
 | GitHub Actions CI | ✅ |
-
-### Will NOT be implemented
-
-| Feature | Reason |
-|---------|--------|
-| Auto-claim (zero-click) | Epic needs browser session cookies, XSRF, hCaptcha — cannot be forged |
-| Account login / Device auth | Not needed — free games data is public |
-| Full game library | Epic library-service API requires OAuth not allowed for localhost |
 
 ---
 
@@ -72,6 +67,18 @@ Open **http://localhost:8080** — no login, no config.
 | `SCHEDULE_DAY` | `fri` | Trigger day |
 | `SCHEDULE_HOUR` | `0` | Trigger hour |
 | `SCHEDULE_MINUTE` | `5` | Trigger minute |
+| `NOTIFY_WEBHOOK_TYPE` | — | Notification channel: `bark`/`pushplus`/`serverchan`/`telegram`/`generic` |
+| `NOTIFY_WEBHOOK_URL` | — | Webhook URL |
+| `NOTIFY_WEBHOOK_TOKEN` | — | Token / device key / sendkey / chat_id |
+
+### Notification Channels
+
+| Channel | Config | Notes |
+|---------|--------|-------|
+| **Bark** | iOS push app | `NOTIFY_WEBHOOK_TOKEN=bark-key` |
+| **PushPlus** | WeChat push (recommended) | `NOTIFY_WEBHOOK_TYPE=pushplus`, `PUSHPLUS_CHANNEL=wechat` |
+| **Server 酱** | WeChat push | `NOTIFY_WEBHOOK_TYPE=serverchan` |
+| **Telegram** | Bot to channel/group | `NOTIFY_WEBHOOK_TYPE=telegram` |
 
 ---
 
