@@ -15,7 +15,7 @@ function createSettingsModal() {
             <div class="modal-body">
                 <div class="setting-section">
                     <h3>推送渠道</h3>
-                    <p class="text-muted" style="font-size:13px;margin:4px 0 12px;">配置后，每周免费游戏更新时会自动推送到你的设备</p>
+                    <p class="text-muted" style="font-size:13px;margin:4px 0 12px;">配置后，每周五检测到新免费游戏时会自动推送到你的设备。所有推送均为免费服务。</p>
 
                     <div class="form-group">
                         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
@@ -25,42 +25,64 @@ function createSettingsModal() {
                     </div>
 
                     <div class="form-group">
-                        <label for="push-type">推送渠道</label>
+                        <label for="push-type">选择推送渠道</label>
                         <select id="push-type">
-                            <option value="">请选择渠道</option>
-                            <option value="bark">📱 Bark（iOS 推送）</option>
-                            <option value="serverchan">💬 Server 酱（微信）</option>
-                            <option value="pushplus">📮 PushPlus（微信/钉钉/飞书/邮件）</option>
-                            <option value="telegram">✈️ Telegram Bot</option>
-                            <option value="generic">🔗 通用 Webhook</option>
+                            <option value="">— 请选择 —</option>
+                            <option value="bark">📱 Bark — iOS 原生推送（推荐）</option>
+                            <option value="serverchan">💬 Server 酱 — 微信推送</option>
+                            <option value="pushplus">📮 PushPlus — 微信/钉钉/飞书/邮件（推荐）</option>
+                            <option value="telegram">✈️ Telegram Bot — 群组/频道推送</option>
+                            <option value="generic">🔗 通用 Webhook — 自定义 URL</option>
                         </select>
                     </div>
 
+                    <!-- Bark 指引 -->
                     <div class="push-config-group" id="config-bark" style="display:none;">
+                        <div class="push-guide" style="background:var(--epic-bg-secondary);border:1px solid var(--epic-border);border-radius:8px;padding:12px;margin-bottom:12px;font-size:12px;color:var(--epic-text-secondary);">
+                            <strong>📱 Bark 配置步骤：</strong><br>
+                            1. iOS App Store 搜索安装 <strong>Bark</strong><br>
+                            2. 打开 App → 点击"开始使用"<br>
+                            3. 复制你的 <strong>Device Key</strong>（一串字母数字）<br>
+                            4. 粘贴到下方即可
+                        </div>
                         <div class="form-group">
                             <label for="push-token">Device Key</label>
                             <input type="text" id="push-token" placeholder="例如：ABC123def456ghi...">
-                            <span class="form-help">在 Bark App 中获取</span>
                         </div>
                     </div>
 
+                    <!-- Server 酱 指引 -->
                     <div class="push-config-group" id="config-serverchan" style="display:none;">
+                        <div class="push-guide" style="background:var(--epic-bg-secondary);border:1px solid var(--epic-border);border-radius:8px;padding:12px;margin-bottom:12px;font-size:12px;color:var(--epic-text-secondary);">
+                            <strong>💬 Server 酱配置步骤：</strong><br>
+                            1. 访问 <a href="https://sct.ftqq.com" target="_blank" style="color:var(--epic-blue);">sct.ftqq.com</a> 注册账号<br>
+                            2. 进入"发送消息"页面<br>
+                            3. 复制你的 <strong>SendKey</strong>（SCT开头的一串字符）<br>
+                            4. 粘贴到下方即可
+                        </div>
                         <div class="form-group">
                             <label for="push-token">SendKey</label>
                             <input type="text" id="push-token" placeholder="例如：SCT123456...">
-                            <span class="form-help">在 https://sct.ftqq.com 注册获取</span>
                         </div>
                     </div>
 
+                    <!-- PushPlus 指引 -->
                     <div class="push-config-group" id="config-pushplus" style="display:none;">
+                        <div class="push-guide" style="background:var(--epic-bg-secondary);border:1px solid var(--epic-border);border-radius:8px;padding:12px;margin-bottom:12px;font-size:12px;color:var(--epic-text-secondary);">
+                            <strong>📮 PushPlus 配置步骤：</strong><br>
+                            1. 微信搜索公众号 <strong>"PushPlus推送助手"</strong> 或访问 <a href="http://www.pushplus.plus" target="_blank" style="color:var(--epic-blue);">pushplus.plus</a><br>
+                            2. 点击"注册"获取你的 <strong>Token</strong><br>
+                            3. 选择推送方式（下方下拉菜单）<br>
+                            4. Token 粘贴到下方，然后保存
+                        </div>
                         <div class="form-group">
                             <label for="push-token">Token</label>
-                            <input type="text" id="push-token" placeholder="例如：abc123def456...">
+                            <input type="text" id="push-token" placeholder="在 PushPlus 注册的 Token">
                         </div>
                         <div class="form-group">
                             <label for="push-channel">推送方式</label>
                             <select id="push-channel">
-                                <option value="wechat">微信</option>
+                                <option value="wechat">微信公众号（推荐）</option>
                                 <option value="webhook">Webhook</option>
                                 <option value="email">邮件</option>
                                 <option value="sms">短信</option>
@@ -70,22 +92,41 @@ function createSettingsModal() {
                         </div>
                     </div>
 
+                    <!-- Telegram 指引 -->
                     <div class="push-config-group" id="config-telegram" style="display:none;">
+                        <div class="push-guide" style="background:var(--epic-bg-secondary);border:1px solid var(--epic-border);border-radius:8px;padding:12px;margin-bottom:12px;font-size:12px;color:var(--epic-text-secondary);">
+                            <strong>✈️ Telegram Bot 配置步骤：</strong><br>
+                            1. 在 Telegram 搜索 <strong>@BotFather</strong>，发送 <code>/newbot</code> 创建机器人<br>
+                            2. 按提示设置名称，复制获得的 <strong>Bot Token</strong>（格式：123456:ABC-DEF...）<br>
+                            3. 将 bot 加入一个群组（或将 bot 添加到你的频道）<br>
+                            4. 在群组中发送任意消息，然后搜索 <strong>@MissRose_Bot</strong>，发送 <code>/info</code> 获取你的 Chat ID<br>
+                            5. Chat ID 填上方框，Bot Token 填下方框
+                        </div>
                         <div class="form-group">
                             <label for="push-token">Chat ID</label>
                             <input type="text" id="push-token" placeholder="例如：-1001234567890">
                         </div>
                         <div class="form-group">
                             <label for="push-url">Bot Token</label>
-                            <input type="text" id="push-url" placeholder="例如：123456:ABC-DEF1234...">
-                            <span class="form-help">通过 @BotFather 创建机器人获取</span>
+                            <input type="text" id="push-url" placeholder="格式：123456:ABC-DEF1234...">
                         </div>
                     </div>
 
+                    <!-- 通用 Webhook 指引 -->
                     <div class="push-config-group" id="config-generic" style="display:none;">
+                        <div class="push-guide" style="background:var(--epic-bg-secondary);border:1px solid var(--epic-border);border-radius:8px;padding:12px;margin-bottom:12px;font-size:12px;color:var(--epic-text-secondary);">
+                            <strong>🔗 通用 Webhook 配置说明：</strong><br>
+                            每周五检测到新游戏时，系统会向此 URL 发送 <strong>POST 请求</strong>，JSON 格式：<br>
+                            <pre style="background:#000;padding:8px;border-radius:4px;margin:8px 0 0;overflow-x:auto;font-size:11px;">{
+  "title": "🎮 Epic 本周 3 款免费游戏",
+  "body": "📅 本周免费领取...",
+  "games": [{"title":"游戏名","url":"...","original_price":"¥99.00","end_date":"..."}],
+  "timestamp": 1726080300
+}</pre>
+                        </div>
                         <div class="form-group">
                             <label for="push-url">Webhook URL</label>
-                            <input type="url" id="push-url" placeholder="例如：https://your-server.com/webhook">
+                            <input type="url" id="push-url" placeholder="https://your-server.com/epic-notify">
                         </div>
                     </div>
 

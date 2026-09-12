@@ -110,6 +110,53 @@ async def health():
     }
 
 
+@app.get("/api/free-games")
+async def get_free_games():
+    """获取本周免费游戏 + 下周预告（纯 HTTP，无需登录）"""
+    from app.epic_api import EpicAPIClient
+    try:
+        async with EpicAPIClient() as client:
+            logger.info("Fetching free games")
+            games, upcoming = await client.fetch_free_games()
+            return {
+                "success": True,
+                "free_games": [
+                    {
+                        "title": g.title,
+                        "url": g.url,
+                        "offer_id": g.offer_id,
+                        "namespace": g.namespace,
+                        "image_url": g.image_url,
+                        "description": g.description,
+                        "start_date": g.start_date,
+                        "end_date": g.end_date,
+                        "original_price": g.original_price,
+                    }
+                    for g in games
+                ],
+                "upcoming_free_games": [
+                    {
+                        "title": g.title,
+                        "url": g.url,
+                        "offer_id": g.offer_id,
+                        "namespace": g.namespace,
+                        "image_url": g.image_url,
+                        "description": g.description,
+                        "start_date": g.start_date,
+                        "end_date": g.end_date,
+                        "original_price": g.original_price,
+                    }
+                    for g in upcoming
+                ],
+            }
+    except Exception as e:
+        logger.exception("获取免费游戏列表失败")
+        return {
+            "success": False,
+            "error": f"{type(e).__name__}: {e}",
+        }
+
+
 # ----- 历史 -----
 
 def _get_record_expires_at(record: dict) -> Optional[str]:
