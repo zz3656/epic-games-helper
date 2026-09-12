@@ -45,11 +45,13 @@ class ClaimScheduler:
         config: Config,
         store: ResultStore,
         credential_store: CredentialStore,
+        user_store=None,
         auto_claim_enabled: bool = False,
     ):
         self.config = config
         self.store = store
         self.cred_store = credential_store
+        self.user_store = user_store  # 用户存储（多租户推送）
         self.auto_claim_enabled = auto_claim_enabled  # 已废弃，保留仅为兼容
         self.scheduler = AsyncIOScheduler(timezone=config.timezone)
         self._lock = asyncio.Lock()
@@ -83,12 +85,27 @@ class ClaimScheduler:
         # 启动时立即加载上一次 fingerprint（避免首次运行误报"新游戏"）
         self._previous_fingerprint = self._load_previous_fingerprint()
         next_run = self.scheduler.get_job("epic_weekly_check").next_run_time
+
+        # 检查全局 webhook 和用户推送
+        user_push_count = 0
+        if self.user_store:
+            users = self.user_store.list_users()
+            user_push_count = sum(1 for u in users if u.get("push_config", {}).get("enabled"))
+
+        notify_status = ""
+        if self.notifier.enabled:
+            notify_status = "已启用（全局 webhook）"
+        if user_push_count > 0:
+            notify_status += f" + {user_push_count}个用户推送"
+        if not notify_status:
+            notify_status = "未配置"
+
         logger.info(
             "定时任务已启动：每周 %s %02d:%02d (%s) | 下次运行：%s | 通知：%s",
             day, self.config.schedule_hour, self.config.schedule_minute,
             self.config.timezone,
             next_run.strftime("%Y-%m-%d %H:%M:%S") if next_run else "未知",
-            "已启用" if self.notifier.enabled else "未配置 webhook",
+            notify_status,
         )
 
     def enable_auto_claim(self, enabled: bool):
@@ -157,14 +174,8 @@ class ClaimScheduler:
                         self._record_to_history(games, upcoming, notified=True)
                         self._last_week_id = week_id
 
-                    # 4. 推送通知（仅当有 webhook 时）
-                    if self.notifier.enabled:
-                        await self._send_notification(games, upcoming)
-                    else:
-                        logger.info(
-                            "未配置 webhook，跳过推送 "
-                            "（如需推送，请配置 NOTIFY_WEBHOOK_TYPE/URL/TOKEN）"
-                        )
+                    # 4. 推送通知（全局 webhook + 每个用户的推送渠道）
+                    await self._send_notification(games, upcoming)
 
                     # 5. 更新 fingerprint
                     self._previous_fingerprint = current_fingerprint
@@ -307,7 +318,12 @@ class ClaimScheduler:
             logger.exception("写入历史失败: %s", e)
 
     async def _send_notification(self, games, upcoming):
-        """构造推送内容并发送"""
+        """构造推送内容并发送
+
+        推送目标：
+        1. 全局 webhook（NOTIFY_WEBHOOK_* 环境变量）
+        2. 所有已启用推送的用户（user_store 中 push_config.enabled=True）
+        """
         # 推送的 games dict 列表（限制字段避免传输过大）
         push_games = []
         for g in games:
@@ -330,17 +346,59 @@ class ClaimScheduler:
             lines.append(f"📅 下周预告：{', '.join(u.title for u in upcoming)}")
         body = "\n".join(lines)
 
-        sent = await self.notifier.send(
-            title=title,
-            body=body,
-            games=push_games,
-            level="timeSensitive",
-            icon="🎮",
-        )
-        if sent:
-            logger.info("📲 推送通知已发送")
+        total_sent = 0
+
+        # 1. 全局 webhook
+        if self.notifier.enabled:
+            sent = await self.notifier.send(
+                title=title,
+                body=body,
+                games=push_games,
+                level="timeSensitive",
+                icon="🎮",
+            )
+            if sent:
+                total_sent += 1
+                logger.info("📲 全局 webhook 推送成功")
+            else:
+                logger.warning("📲 全局 webhook 推送失败")
+
+        # 2. 每个用户的推送渠道
+        if self.user_store:
+            users = self.user_store.list_users()
+            for user in users:
+                push_config = user.get("push_config", {})
+                if not push_config.get("enabled"):
+                    continue
+
+                user_notifier = Notifier(user_push_config=push_config)
+                if not user_notifier.enabled:
+                    continue
+
+                try:
+                    sent = await user_notifier.send(
+                        title=title,
+                        body=body,
+                        games=push_games,
+                        level="timeSensitive",
+                        icon="🎮",
+                    )
+                    if sent:
+                        total_sent += 1
+                        logger.info("📲 用户 %s 推送成功", user["username"])
+                    else:
+                        logger.warning("📲 用户 %s 推送失败", user["username"])
+                except Exception as e:
+                    logger.exception("📲 用户 %s 推送异常: %s", user["username"], e)
+
+        if total_sent > 0:
+            logger.info("📲 本轮推送完成：共 %d 个渠道成功", total_sent)
         else:
-            logger.warning("📲 推送通知失败")
+            logger.info(
+                "未配置任何推送渠道，跳过推送 "
+                "（如需推送，请配置全局环境变量 NOTIFY_WEBHOOK_TYPE/URL/TOKEN，"
+                "或在用户设置中配置推送渠道）"
+            )
 
 
 def _mask(u: str) -> str:

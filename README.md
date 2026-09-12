@@ -87,7 +87,7 @@
 ```bash
 docker run -d \
   --name epic-helper \
-  -p 8080:8000 \
+  -p 8080:8080 \
   -v $(pwd)/logs:/app/logs \
   --restart unless-stopped \
   zz3656/epic-games-helper:latest
@@ -106,7 +106,7 @@ The page shows:
 ```bash
 docker run -d \
   --name epic-helper \
-  -p 8080:8000 \
+  -p 8080:8080 \
   -v $(pwd)/logs:/app/logs \
   -e TZ=Asia/Shanghai \
   -e SCHEDULE_DAY=fri \
@@ -127,7 +127,7 @@ services:
     container_name: epic-games-helper
     restart: unless-stopped
     ports:
-      - "8080:8000"
+      - "8080:8080"
     environment:
       - TZ=Asia/Shanghai
       # Epic updates free games at Beijing 00:00 every Friday
@@ -183,7 +183,7 @@ Swagger docs at **http://localhost:8080/docs**.
 └────────────────────────────────────────────────────────────┘
                             ↓
 ┌────────────────────────────────────────────────────────────┐
-│  FastAPI Backend (port 8000)                               │
+│  FastAPI Backend (port 8080)                               │
 │  • /api/free-games             weekly + upcoming games     │
 │  • /api/history                claim history               │
 │  • /api/scheduler/*            manual trigger              │

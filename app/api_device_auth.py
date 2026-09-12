@@ -327,31 +327,101 @@ async def test_scheduler_run():
         return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
 
 
-@router.post("/api/scheduler/test-notify")
-async def test_scheduler_notify():
-    """发送测试推送（调试用，验证 webhook 配置是否正确）"""
+@router.get("/api/scheduler/status")
+async def scheduler_status():
+    """获取调度器状态（下次运行时间、通知状态）"""
     from app.main import scheduler as _sched
     if _sched is None:
         return JSONResponse(content={"success": False, "error": "scheduler 未初始化"}, status_code=500)
-    if not _sched.notifier.enabled:
+    
+    job = _sched.scheduler.get_job("epic_weekly_check")
+    next_run = job.next_run_time.strftime("%Y-%m-%d %H:%M:%S") if job and job.next_run_time else None
+    
+    notify_status = []
+    if _sched.notifier.enabled:
+        notify_status.append("全局 webhook")
+    if _sched.user_store:
+        users = _sched.user_store.list_users()
+        user_push = [u["username"] for u in users if u.get("push_config", {}).get("enabled")]
+        if user_push:
+            notify_status.append(f"{len(user_push)} 个用户 ({', '.join(user_push)})")
+    
+    return JSONResponse(content={
+        "success": True,
+        "schedule": {
+            "day": _sched.config.schedule_day,
+            "hour": _sched.config.schedule_hour,
+            "minute": _sched.config.schedule_minute,
+            "timezone": _sched.config.timezone,
+            "next_run": next_run,
+        },
+        "notification": notify_status,
+    })
+
+
+@router.post("/api/scheduler/test-notify")
+async def test_scheduler_notify():
+    """发送测试推送（调试用，验证 webhook 配置是否正确）"""
+    from app.main import scheduler as _sched, user_store as _user_store
+    from app.notifier import Notifier
+    if _sched is None:
+        return JSONResponse(content={"success": False, "error": "scheduler 未初始化"}, status_code=500)
+
+    test_games = [{
+        "title": "测试游戏",
+        "url": "https://store.epicgames.com/zh-CN/free-games",
+        "original_price": "¥99.00",
+        "end_date": "2026-12-31",
+    }]
+    sent_count = 0
+    errors = []
+
+    # 1. 全局 webhook
+    if _sched.notifier.enabled:
+        sent = await _sched.notifier.send(
+            title="🎮 Epic 推送测试",
+            body="这是一条测试推送。如果你收到了这条消息，说明 webhook 配置正确。",
+            games=test_games,
+        )
+        if sent:
+            sent_count += 1
+        else:
+            errors.append("全局 webhook 推送失败")
+
+    # 2. 所有已启用推送的用户
+    if _user_store:
+        users = _user_store.list_users()
+        for user in users:
+            push_config = user.get("push_config", {})
+            if not push_config.get("enabled"):
+                continue
+            user_notifier = Notifier(user_push_config=push_config)
+            if not user_notifier.enabled:
+                continue
+            sent = await user_notifier.send(
+                title="🎮 Epic 推送测试",
+                body="这是一条测试推送。如果你收到了这条消息，说明推送配置正确。",
+                games=test_games,
+            )
+            if sent:
+                sent_count += 1
+            else:
+                errors.append(f"用户 {user['username']} 推送失败")
+
+    if sent_count > 0:
+        return JSONResponse(content={
+            "success": True,
+            "message": f"推送成功，共 {sent_count} 个渠道",
+            "sent_count": sent_count,
+            "errors": errors,
+        })
+    else:
         return JSONResponse(content={
             "success": False,
-            "error": "Webhook 未配置。请设置 NOTIFY_WEBHOOK_TYPE/NOTIFY_WEBHOOK_URL/NOTIFY_WEBHOOK_TOKEN 环境变量",
-        }, status_code=400)
-    sent = await _sched.notifier.send(
-        title="🎮 Epic 推送测试",
-        body="这是一条测试推送。如果你收到了这条消息，说明 webhook 配置正确。",
-        games=[{
-            "title": "测试游戏",
-            "url": "https://store.epicgames.com/zh-CN/free-games",
-            "original_price": "¥99.00",
-            "end_date": "2026-12-31",
-        }],
-    )
-    return JSONResponse(content={
-        "success": sent,
-        "message": "推送已发送" if sent else "推送失败（查看后端日志）",
-    })
+            "message": "未推送成功任何渠道。请配置全局环境变量 NOTIFY_WEBHOOK_TYPE/URL/TOKEN，"
+                       "或设置用户推送渠道",
+            "errors": errors or ["没有已配置的推送渠道"],
+        })
 
 
 @router.post("/api/device-auth/test/free-games-raw")

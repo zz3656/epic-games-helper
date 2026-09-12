@@ -24,6 +24,8 @@ from app.config import load_config
 from app.credential_store import CredentialStore
 from app.scheduler import ClaimScheduler
 from app.storage import ResultStore
+from app.user_store import UserStore
+from app.auth import create_token, get_current_user, require_login
 
 # ============== 数据模型 ==============
 class AutoClaimToggle(BaseModel):
@@ -41,11 +43,13 @@ logger = logging.getLogger(__name__)
 config = load_config()
 store = ResultStore()
 cred_store = CredentialStore(key=os.getenv("EPIC_MASTER_KEY"))
+user_store = UserStore()
 auto_claim_default = os.getenv("AUTO_CLAIM_ENABLED", "false").lower() == "true"
 scheduler = ClaimScheduler(
     config=config,
     store=store,
     credential_store=cred_store,
+    user_store=user_store,
     auto_claim_enabled=auto_claim_default,
 )
 
@@ -59,6 +63,11 @@ async def lifespan(app: FastAPI):
                     "已启用" if auto_claim_default else "未启用")
     else:
         logger.info("未配置 device auth，需先通过 Web 端完成 Epic 设备码授权")
+    if user_store:
+        users = user_store.list_users()
+        logger.info("系统有 %d 个用户 (存储路径: %s)", len(users), user_store.path)
+    logger.info("历史文件路径: %s", store.file_path)
+    logger.info("设备认证路径: %s", cred_store.device_auth_path)
     logger.info("Epic Games 免费游戏助手服务已启动")
     yield
     # 关闭
@@ -87,6 +96,13 @@ set_credential_store(cred_store)
 # 注册封面代理路由（让国内用户走本地中转，加载 Epic CDN 封面图）
 from app.api_cover_proxy import router as cover_proxy_router
 app.include_router(cover_proxy_router)
+
+# 注册用户管理路由（user_store 和 auth 模块通过模块级变量注入）
+from app import api_users
+api_users._user_store = user_store
+api_users._auth_module = __import__("app.auth", fromlist=[""])
+from app.api_users import router as user_router
+app.include_router(user_router)
 
 
 # ============== 页面路由 ==============
@@ -326,6 +342,6 @@ if __name__ == "__main__":
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",
-        port=8000,
+        port=8080,
         log_level=config.log_level.lower(),
     )

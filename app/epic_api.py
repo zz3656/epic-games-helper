@@ -532,7 +532,7 @@ class EpicAPIClient:
         """从本地 low_prices.json 加载历史最低价数据"""
         import json
         import os
-        low_file = "/app/data/low_prices.json"
+        low_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "low_prices.json")
         if os.path.exists(low_file):
             try:
                 with open(low_file, "r", encoding="utf-8") as f:

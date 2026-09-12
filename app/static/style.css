@@ -1171,3 +1171,246 @@ code {
 .mt-2 { margin-top: 16px; }
 .mb-1 { margin-bottom: 8px; }
 .mb-2 { margin-bottom: 16px; }
+
+/* ============ 用户认证 ============ */
+
+/* 导航栏用户区域 */
+.nav-username {
+    font-size: 14px;
+    color: var(--epic-text-body);
+}
+
+.btn-login, .btn-settings, .btn-logout {
+    background: none;
+    border: 1px solid var(--epic-border);
+    color: var(--epic-text-body);
+    padding: 4px 12px;
+    border-radius: var(--epic-radius-sm);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-login:hover, .btn-settings:hover, .btn-logout:hover {
+    border-color: var(--epic-blue);
+    color: var(--epic-blue);
+}
+
+/* 模态框 */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 9998;
+}
+
+.modal-content {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--epic-surface-1);
+    border: 1px solid var(--epic-border);
+    border-radius: var(--epic-radius-lg);
+    width: 90%;
+    max-width: 420px;
+    max-height: 90vh;
+    overflow-y: auto;
+    z-index: 9999;
+    padding: 0;
+}
+
+.auth-modal-content {
+    max-width: 400px;
+}
+
+.settings-modal-content {
+    max-width: 480px;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--epic-border);
+}
+
+.modal-header h2 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--epic-text-primary);
+    margin: 0;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: var(--epic-text-muted);
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--epic-radius-sm);
+    transition: all 0.2s;
+}
+
+.modal-close:hover {
+    background: var(--epic-surface-3);
+    color: var(--epic-text-primary);
+}
+
+.modal-body {
+    padding: 24px;
+}
+
+/* 表单元素 */
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--epic-text-secondary);
+    margin-bottom: 6px;
+}
+
+.form-group input[type="text"],
+.form-group input[type="password"],
+.form-group input[type="url"],
+.form-group select {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--epic-surface-2);
+    border: 1px solid var(--epic-border);
+    border-radius: var(--epic-radius-sm);
+    color: var(--epic-text-primary);
+    font-size: 14px;
+    font-family: var(--epic-font);
+    transition: border-color 0.2s;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: var(--epic-blue);
+}
+
+.form-group input::placeholder {
+    color: var(--epic-text-muted);
+}
+
+.form-help {
+    display: block;
+    font-size: 11px;
+    color: var(--epic-text-muted);
+    margin-top: 4px;
+}
+
+.form-error {
+    background: var(--epic-red-subtle);
+    color: var(--epic-red);
+    padding: 10px 12px;
+    border-radius: var(--epic-radius-sm);
+    font-size: 13px;
+    margin-top: 8px;
+}
+
+.form-success {
+    background: var(--epic-green-subtle);
+    color: var(--epic-green);
+    padding: 10px 12px;
+    border-radius: var(--epic-radius-sm);
+    font-size: 13px;
+    margin-top: 8px;
+}
+
+/* 按钮 */
+.btn-primary {
+    background: var(--epic-blue);
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: var(--epic-radius-sm);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-primary:hover {
+    background: var(--epic-blue-hover);
+}
+
+.btn-secondary {
+    background: var(--epic-surface-3);
+    color: var(--epic-text-body);
+    border: 1px solid var(--epic-border);
+    padding: 10px 20px;
+    border-radius: var(--epic-radius-sm);
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+    background: var(--epic-surface-4);
+    border-color: var(--epic-border-strong);
+}
+
+.btn-danger {
+    background: var(--epic-red);
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: var(--epic-radius-sm);
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-danger:hover {
+    background: #C0392B;
+}
+
+/* 认证切换 */
+.auth-switch {
+    font-size: 13px;
+}
+
+/* 设置区域 */
+.setting-section {
+    margin-bottom: 16px;
+}
+
+.setting-section h3 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--epic-text-primary);
+    margin-bottom: 8px;
+}
+
+/* Toast 提示 */
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.epic-toast {
+    animation: slideInRight 0.3s ease;
+}

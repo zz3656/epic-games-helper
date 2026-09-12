@@ -8,7 +8,7 @@ import logging
 import os
 import threading
 from collections import deque
-from typing import List
+from typing import List, Optional
 
 from app.result import ClaimResult
 
@@ -23,7 +23,17 @@ class ResultStore:
     注意：写入文件时使用自定义 to_safe_dict()，确保不会意外写入敏感字段。
     """
 
-    def __init__(self, file_path: str = "/app/logs/history.json"):
+    def __init__(self, file_path: Optional[str] = None):
+        if file_path is None:
+            # 优先 /app/logs/，回退到 app/ 同级目录
+            candidates = ["/app/logs/history.json"]
+            try:
+                os.makedirs("/app/logs", exist_ok=True)
+                file_path = candidates[0]
+            except OSError:
+                candidates.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs", "history.json"))
+                file_path = candidates[1]
+                os.makedirs(os.path.dirname(file_path), exist_ok=True)
         self.file_path = file_path
         self._lock = threading.Lock()
         self._records: deque = deque(maxlen=MAX_RECORDS)

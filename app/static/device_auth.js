@@ -4,6 +4,47 @@
 let currentWeeklyGames = null;
 let currentUpcomingGames = null;
 
+// ============ 用户认证状态 ============
+let currentUser = null;  // { username, nickname }
+let authToken = null;    // JWT token
+
+// 从 localStorage 恢复 token
+function loadAuthToken() {
+    try {
+        authToken = localStorage.getItem('epic_auth_token');
+    } catch(e) {}
+}
+
+function saveAuthToken(token) {
+    try {
+        authToken = token;
+        localStorage.setItem('epic_auth_token', token);
+    } catch(e) {}
+}
+
+function clearAuthToken() {
+    try {
+        localStorage.removeItem('epic_auth_token');
+    } catch(e) {}
+    authToken = null;
+    currentUser = null;
+}
+
+// 带 token 的 fetch（自动附加 Authorization header）
+async function fetchWithAuth(url, options = {}) {
+    const headers = {
+        ...(options.headers || {}),
+    };
+    if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+    }
+    // 不重复设置 Content-Type，让浏览器自动设置（处理 JSON 序列化）
+    if (options.body && !headers['Content-Type'] && typeof options.body === 'object') {
+        headers['Content-Type'] = 'application/json';
+    }
+    return fetch(url, { ...options, headers });
+}
+
 // HTML 转义工具函数（全局可用）
 function escapeHtml(str) {
     if (typeof str !== 'string') return str;
@@ -54,6 +95,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     // 设置导航状态
     navStatusDot.classList.add("configured");
     navStatusText.textContent = "已连接";
+
+    // 先初始化认证（加载 token + 用户 UI）
+    await initAuth();
 
     // 直接加载免费游戏、促销和历史
     weeklyFreeSection.hidden = false;

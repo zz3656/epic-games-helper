@@ -24,6 +24,26 @@ from typing import Optional
 
 from cryptography.fernet import Fernet, InvalidToken
 
+
+def _get_data_path(filename: str) -> str:
+    """确定数据文件路径，优先 /app/data/，回退到 app/ 同级目录"""
+    candidates = [os.path.join("/app/data", filename)]
+    try:
+        os.makedirs("/app/data", exist_ok=True)
+        return candidates[0]
+    except OSError:
+        pass
+    candidates.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", filename))
+    # 规范化路径
+    candidates = [os.path.normpath(c) for c in candidates]
+    for c in candidates:
+        try:
+            os.makedirs(os.path.dirname(c), exist_ok=True)
+            return c
+        except OSError:
+            continue
+    return candidates[0]
+
 logger = logging.getLogger(__name__)
 
 
@@ -33,8 +53,10 @@ class CredentialStore:
     def __init__(
         self,
         key: Optional[str] = None,
-        device_auth_path: str = "/app/data/device_auth.enc",
+        device_auth_path: Optional[str] = None,
     ):
+        if device_auth_path is None:
+            device_auth_path = _get_data_path("device_auth.enc")
         self.device_auth_path = device_auth_path
         self._lock = threading.Lock()
         self._fernet: Optional[Fernet] = None

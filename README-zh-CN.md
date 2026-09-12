@@ -86,7 +86,7 @@
 ```bash
 docker run -d \
   --name epic-helper \
-  -p 8080:8000 \
+  -p 8080:8080 \
   -v $(pwd)/logs:/app/logs \
   --restart unless-stopped \
   zz3656/epic-games-helper:latest
@@ -106,7 +106,7 @@ docker run -d \
 ```bash
 docker run -d \
   --name epic-helper \
-  -p 8080:8000 \
+  -p 8080:8080 \
   -v $(pwd)/logs:/app/logs \
   -e TZ=Asia/Shanghai \
   -e SCHEDULE_DAY=fri \
@@ -127,7 +127,7 @@ services:
     container_name: epic-games-helper
     restart: unless-stopped
     ports:
-      - "8080:8000"
+      - "8080:8080"
     environment:
       - TZ=Asia/Shanghai
       - SCHEDULE_DAY=fri
@@ -182,7 +182,7 @@ Swagger 文档：**http://localhost:8080/docs**
 └────────────────────────────────────────────────────────────┘
                             ↓
 ┌────────────────────────────────────────────────────────────┐
-│  FastAPI 后端（端口 8000）                                │
+│  FastAPI 后端（端口 8080）                                │
 │  • /api/free-games             本周 + 下周游戏             │
 │  • /api/promotions             本周促销折扣                │
 │  • /api/history                领取历史                    │

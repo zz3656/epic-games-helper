@@ -64,14 +64,27 @@ class Notifier:
     - generic:    通用 webhook，POST JSON {title, body, games}
     """
 
-    def __init__(self):
-        self.type = (os.getenv("NOTIFY_WEBHOOK_TYPE") or "").strip().lower()
-        self.url = (os.getenv("NOTIFY_WEBHOOK_URL") or "").strip()
-        self.token = (os.getenv("NOTIFY_WEBHOOK_TOKEN") or "").strip()
-        # PushPlus 专用：推送方式（wechat/email/webhook/bark/sms/voice）
-        self.pushplus_channel = os.getenv("PUSHPLUS_CHANNEL", "wechat").strip().lower()
-        # Telegram 专用：chat_id（如 url 未包含）
-        self.telegram_chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+    def __init__(self, user_push_config: Optional[dict] = None):
+        """初始化 Notifier
+
+        Args:
+            user_push_config: 用户推送配置（来自 user_store）
+                              如果为 None，则使用全局环境变量
+        """
+        if user_push_config:
+            # 使用用户配置
+            self.type = (user_push_config.get("type") or "").strip().lower()
+            self.url = (user_push_config.get("url") or "").strip()
+            self.token = (user_push_config.get("token") or "").strip()
+            self.pushplus_channel = (user_push_config.get("channel") or "wechat").strip().lower()
+            self.telegram_chat_id = ""
+        else:
+            # 使用全局环境变量
+            self.type = (os.getenv("NOTIFY_WEBHOOK_TYPE") or "").strip().lower()
+            self.url = (os.getenv("NOTIFY_WEBHOOK_URL") or "").strip()
+            self.token = (os.getenv("NOTIFY_WEBHOOK_TOKEN") or "").strip()
+            self.pushplus_channel = os.getenv("PUSHPLUS_CHANNEL", "wechat").strip().lower()
+            self.telegram_chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
 
     @property
     def enabled(self) -> bool:
