@@ -35,40 +35,22 @@ AUTO_CLAIM_ENABLED=true
 
 # Webhook 推送（可选，如需启用请取消注释并填入实际值）
 #
-# 支持渠道：bark | serverchan | pushplus | telegram | generic
+# 支持渠道：serverchan | telegram
 #
-# 1. Bark（iOS 推送）
-#    下载 Bark App → 获取 device key
-#    NOTIFY_WEBHOOK_TYPE=bark
-#    NOTIFY_WEBHOOK_TOKEN=YourDeviceKey
-#
-# 2. PushPlus（微信推送，推荐）
-#    访问 http://www.pushplus.plus → 注册获取 token
-#    NOTIFY_WEBHOOK_TYPE=pushplus
-#    NOTIFY_WEBHOOK_TOKEN=YourPushPlusToken
-#
-# 3. Server 酱（微信推送）
+# 1. Server 酱（微信推送）
 #    访问 https://sct.ftqq.com → 注册获取 sendkey
 #    NOTIFY_WEBHOOK_TYPE=serverchan
 #    NOTIFY_WEBHOOK_TOKEN=YourServerChanSendKey
 #
-# 4. Telegram Bot
+# 2. Telegram Bot
 #    @BotFather 创建 bot → 获取 token
 #    添加 bot 到频道/群组 → 获取 chat_id
 #    NOTIFY_WEBHOOK_TYPE=telegram
 #    NOTIFY_WEBHOOK_URL=https://api.telegram.org/bot{token}/sendMessage
 #    NOTIFY_WEBHOOK_TOKEN={chat_id}
 #
-# 5. 通用 Webhook
-#    NOTIFY_WEBHOOK_TYPE=generic
-#    NOTIFY_WEBHOOK_URL=https://your-server.com/webhook
-#
 # 可选环境变量：
-#   PUSHPLUS_CHANNEL=wechat（推送方式：wechat/email/webhook/bark/sms/voice）
 #   TELEGRAM_CHAT_ID=chat_id（如 NOTIFY_WEBHOOK_TOKEN 未设置 chat_id）
-
-# NOTIFY_WEBHOOK_TYPE=bark
-# NOTIFY_WEBHOOK_TOKEN=YourDeviceKey
 EOF
 
     echo "[INFO] .env generated at ${ENV_FILE}"

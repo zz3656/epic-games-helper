@@ -18,7 +18,7 @@
 - 🗂️ **记录** 每周赠送过的游戏（永久历史，按周分组）
 - 🎯 **跳转 Epic 商店** — 点击直达 Epic 商品页
 - 👤 **用户账户** — 注册、登录、配置个人推送渠道
-- 📲 **Webhook 推送** — 通过 Bark、Server 酱、PushPlus、Telegram Bot 或自定义 Webhook 通知
+- 📲 **Webhook 推送** — 通过 Server 酱（微信）或 Telegram Bot 通知
 
 > **浏览无需登录。** 免费游戏和促销数据来自 Epic 公开 API。登录是可选的 — 仅在需要推送通知时使用。
 
@@ -67,12 +67,9 @@
 |------|------|
 | ✅ | **用户注册 & 登录** — JWT 认证，数据存于 `data/users.json` |
 | ✅ | **独立推送配置** — 每个用户可配置自己的通知渠道 |
-| ✅ | **Webhook 推送** — 检测到新免费游戏时推送，支持 5 种渠道： |
-| | &nbsp;&nbsp;&nbsp;&nbsp;• **Bark**（iOS 推送） |
+| ✅ | **Webhook 推送** — 检测到新免费游戏时推送，支持 2 种渠道： |
 | | &nbsp;&nbsp;&nbsp;&nbsp;• **Server 酱**（微信） |
-| | &nbsp;&nbsp;&nbsp;&nbsp;• **PushPlus**（微信/钉钉/飞书/邮件） |
 | | &nbsp;&nbsp;&nbsp;&nbsp;• **Telegram Bot**（群组/频道） |
-| | &nbsp;&nbsp;&nbsp;&nbsp;• **通用 Webhook**（自定义 POST JSON） |
 | ✅ | **全局 + 用户推送** — 同时支持全局（`NOTIFY_WEBHOOK_*`）和每个用户的推送渠道 |
 | ✅ | **测试推送** — 可在 UI 中测试推送配置是否正确 |
 | ✅ | **退出登录** — 可在 UI 中退出 |
@@ -235,7 +232,7 @@ Swagger 文档：**http://localhost:8080/docs**
 │  • /api/auth/*                 注册/登录/推送配置          │
 │  • /api/scheduler/*            手动触发                    │
 │  • APScheduler                 每周五 0:05 定时检查        │
-│  • Notifier                    Webhook 推送（多渠道）      │
+│  • Notifier                    Webhook 推送（Server 酱 / Telegram）│
 │  • UserStore                   基于 JSON 的用户存储        │
 │  • JWT Auth                    Token 认证                  │
 └────────────────────────────────────────────────────────────┘
@@ -248,8 +245,7 @@ Swagger 文档：**http://localhost:8080/docs**
                             ↓
 ┌────────────────────────────────────────────────────────────┐
 │  推送渠道                                                  │
-│  • Bark（iOS）/ Server 酱（微信）/ PushPlus               │
-│  • Telegram Bot / 通用 Webhook                             │
+│  • Server 酱（微信） / Telegram Bot                         │
 │  • 全局 + 用户独立推送                                     │
 └────────────────────────────────────────────────────────────┘
 ```

@@ -52,10 +52,10 @@ class LoginRequest(BaseModel):
 class PushConfigRequest(BaseModel):
     """推送渠道配置"""
     enabled: bool = Field(False, description="是否启用推送")
-    type: str = Field("", description="渠道类型: bark|serverchan|pushplus|telegram|generic")
-    url: str = Field("", description="Webhook URL（Bark 用 token 即可）")
+    type: str = Field("", description="渠道类型: serverchan|telegram")
+    url: str = Field("", description="Webhook URL（仅 Server 酱 / Telegram 需要）")
     token: str = Field("", description="渠道 Token/Key")
-    channel: str = Field("wechat", description="PushPlus 推送方式")
+    channel: str = Field("wechat", description="备用字段（保留兼容）")
 
 
 class PushConfigResponse(BaseModel):
@@ -226,7 +226,7 @@ async def test_push(current_user: dict = Depends(require_login)):
     notifier.pushplus_channel = push_config.get("channel", "wechat")
     notifier.telegram_chat_id = ""
 
-    success = await notifier.send(
+    success, detail = notifier.send_with_detail(
         title="🎮 Epic 推送测试",
         body="这是一条测试推送。如果你收到了这条消息，说明推送配置正确。",
         games=[{
@@ -237,7 +237,11 @@ async def test_push(current_user: dict = Depends(require_login)):
         }],
     )
 
+    message = "推送已发送" if success else "推送失败"
+    if detail:
+        message = f"推送失败：{detail}"
+
     return {
         "success": success,
-        "message": "推送已发送" if success else "推送失败，请检查后端日志",
+        "message": message,
     }

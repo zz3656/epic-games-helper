@@ -246,8 +246,7 @@ Swagger docs at **http://localhost:8080/docs**.
                             ↓
 ┌────────────────────────────────────────────────────────────┐
 │  Push Channels                                               │
-│  • Bark (iOS) / Server 酱 (WeChat) / PushPlus             │
-│  • Telegram Bot / Generic Webhook                          │
+│  • Server 酱 (WeChat) / Telegram Bot                         │
 │  • Global + per-user channels                              │
 └────────────────────────────────────────────────────────────┘
 ```
@@ -262,7 +261,7 @@ epic-games-helper/
 │   ├── main.py                # FastAPI entry
 │   ├── epic_api.py            # Pure HTTP Epic client (freeGamesPromotions)
 │   ├── scheduler.py           # APScheduler weekly check + fingerprint + push
-│   ├── notifier.py            # Webhook push (Bark / Server 酱 / PushPlus / Telegram)
+│   ├── notifier.py            # Webhook push (Server 酱 / Telegram)
 │   ├── storage.py             # History persistence (deque + JSON file)
 │   ├── user_store.py          # User data store (JSON + bcrypt)
 │   ├── auth.py                # JWT auth module

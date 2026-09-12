@@ -2,50 +2,33 @@
 Webhook 通知推送（可选启用）
 
 支持多种推送渠道：
-- Bark（iOS 推送，免费，推荐）
 - Server 酱（微信推送）
-- PushPlus（微信/钉钉/飞书等，免费，推荐）
 - Telegram Bot（频道/群组，免费）
-- 通用 Webhook（自定义 URL）
 
-通过环境变量启用：
-- NOTIFY_WEBHOOK_TYPE=bark|serverchan|pushplus|telegram|generic
+通过全局环境变量启用（与用户配置共存，互不干扰）：
+- NOTIFY_WEBHOOK_TYPE=serverchan|telegram
 - NOTIFY_WEBHOOK_URL=https://...
 - NOTIFY_WEBHOOK_TOKEN=...（各渠道的 key/token）
 
 各渠道配置指南：
 
-1. Bark（iOS 推送）
-   下载 Bark App → 获取 device key → 配置如下：
-   NOTIFY_WEBHOOK_TYPE=bark
-   NOTIFY_WEBHOOK_TOKEN=YourDeviceKey
-
-2. PushPlus（微信推送，推荐）
-   访问 http://www.pushplus.plus → 注册获取 token → 配置如下：
-   NOTIFY_WEBHOOK_TYPE=pushplus
-   NOTIFY_WEBHOOK_TOKEN=YourPushPlusToken
-
-3. Server 酱（微信推送）
-   访问 https://sct.ftqq.com → 注册获取 sendkey → 配置如下：
+1. Server 酱（微信推送）
+   访问 https://sct.ftqq.com → 注册获取 SendKey → 配置如下：
    NOTIFY_WEBHOOK_TYPE=serverchan
-   NOTIFY_WEBHOOK_TOKEN=YourServerChanSendKey
+   NOTIFY_WEBHOOK_TOKEN=SCTxxxxxxxxxx
 
-4. Telegram Bot
+2. Telegram Bot
    通过 @BotFather 创建 bot → 获取 token → 添加 bot 到频道/群组
    获取 chat_id（@MissRose_Bot 输入 /info）→ 配置如下：
    NOTIFY_WEBHOOK_TYPE=telegram
    NOTIFY_WEBHOOK_URL=https://api.telegram.org/bot{token}/sendMessage
    NOTIFY_WEBHOOK_TOKEN={chat_id}
 
-5. 通用 Webhook
-   NOTIFY_WEBHOOK_TYPE=generic
-   NOTIFY_WEBHOOK_URL=https://your-server.com/webhook
-
 如果未配置，则跳过推送（仅写入 history）。
 """
 import logging
 import os
-import urllib.parse
+import time
 from typing import List, Optional
 
 import httpx
@@ -56,13 +39,12 @@ logger = logging.getLogger(__name__)
 class Notifier:
     """Webhook 推送器
 
-    支持的渠道（通过 NOTIFY_WEBHOOK_TYPE 选择）：
-    - bark:       Bark iOS 推送。URL = https://api.day.app/{key}
+    支持的渠道（通过 NOTIFY_WEBHOOK_TYPE 或 user_push_config.type 选择）：
     - serverchan: Server 酱（微信）。URL = https://sctapi.ftqq.com/{sendkey}.send
-    - pushplus:   PushPlus 多渠道推送。Token = 官方 token
     - telegram:   Telegram Bot。URL = https://api.telegram.org/bot{token}/sendMessage
-    - generic:    通用 webhook，POST JSON {title, body, games}
     """
+
+    VALID_TYPES = ["serverchan", "telegram"]
 
     def __init__(self, user_push_config: Optional[dict] = None):
         """初始化 Notifier
@@ -99,36 +81,40 @@ class Notifier:
             title: 通知标题
             body: 通知正文
             games: 游戏列表（每个含 title, url, original_price, end_date）
-            level: bark 的 level（active/timeSensitive/passive）
-            icon: bark 的 icon emoji
+            level: bark 的 level（active/timeSensitive/passive），仅 bark 使用
+            icon: bark 的 icon emoji，仅 bark 使用
 
         Returns:
             是否推送成功
         """
+        success, _ = await self.send_with_detail(title, body, games, level, icon)
+        return success
+
+    async def send_with_detail(self, title: str, body: str, games: Optional[List[dict]] = None,
+                                level: str = "active", icon: str = "🎮") -> tuple:
+        """推送通知，返回 (success: bool, detail: str)
+
+        Returns:
+            (是否成功, 错误详情字符串) — 失败时 detail 包含具体错误信息，成功时为空
+        """
         if not self.enabled:
             logger.info("Webhook 未配置，跳过推送")
-            return False
+            return False, "Webhook 未配置"
 
         if games is None:
             games = []
 
         try:
-            if self.type == "bark":
-                return await self._send_bark(title, body, games, level, icon)
-            elif self.type == "serverchan":
+            if self.type == "serverchan":
                 return await self._send_serverchan(title, body, games)
-            elif self.type == "pushplus":
-                return await self._send_pushplus(title, body, games)
             elif self.type == "telegram":
                 return await self._send_telegram(title, body, games)
-            elif self.type == "generic":
-                return await self._send_generic(title, body, games)
             else:
                 logger.warning("未知的 webhook 类型: %s", self.type)
-                return False
+                return False, f"不支持的推送渠道类型: {self.type}"
         except Exception as e:
             logger.exception("Webhook 推送失败: %s", e)
-            return False
+            return False, f"推送异常: {e}"
 
     # ==================== 构建游戏列表文本 ====================
 
@@ -153,46 +139,7 @@ class Notifier:
 
     # ==================== 各渠道实现 ====================
 
-    async def _send_bark(self, title: str, body: str, games: List[dict],
-                         level: str, icon: str) -> bool:
-        """Bark 推送（iOS 推送，免费）
-
-        URL 格式：https://api.day.app/{device_key}/{title}/{body}
-        """
-        device_key = self.token or self.url.rstrip("/").split("/")[-1]
-        if not device_key or device_key == self.url:
-            logger.error("Bark 配置错误：缺少 device key（设置 NOTIFY_WEBHOOK_TOKEN）")
-            return False
-
-        encoded_title = urllib.parse.quote(title, safe="")
-        full_body = body
-        if games:
-            full_body += "\n\n" + self._build_games_text(games, 5)
-
-        encoded_body = urllib.parse.quote(full_body, safe="")
-        push_url = f"https://api.day.app/{device_key}/{encoded_title}/{encoded_body}"
-
-        params = []
-        params.append(f"icon={icon}")
-        params.append(f"level={level}")
-        params.append("group=epic-games")
-        if len(games) > 5:
-            params.append("isArchive=1")
-        push_url += "?" + "&".join(params)
-
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.get(push_url)
-            if resp.status_code == 200:
-                data = resp.json() if resp.text else {}
-                if data.get("code") == 200:
-                    logger.info("Bark 推送成功: %s", title)
-                    return True
-                logger.warning("Bark 推送失败: %s", data)
-                return False
-            logger.warning("Bark 推送 HTTP %s: %s", resp.status_code, resp.text[:200])
-            return False
-
-    async def _send_serverchan(self, title: str, body: str, games: List[dict]) -> bool:
+    async def _send_serverchan(self, title: str, body: str, games: List[dict]) -> tuple:
         """Server 酱推送（微信推送）
 
         URL 格式：https://sctapi.ftqq.com/{sendkey}.send
@@ -201,7 +148,7 @@ class Notifier:
         sendkey = self.token or self.url.rstrip("/").split("/")[-1].replace(".send", "")
         if not sendkey:
             logger.error("Server 酱配置错误：缺少 send key（设置 NOTIFY_WEBHOOK_TOKEN）")
-            return False
+            return False, "Server 酱配置错误：缺少 send key"
 
         desp = body
         if games:
@@ -214,63 +161,14 @@ class Notifier:
                 data = resp.json()
                 if data.get("code") == 0:
                     logger.info("Server 酱推送成功: %s", title)
-                    return True
+                    return True, ""
+                detail = data.get("message", str(data))
                 logger.warning("Server 酱推送失败: %s", data)
-                return False
+                return False, f"Server 酱返回错误: {detail}"
             logger.warning("Server 酱推送 HTTP %s: %s", resp.status_code, resp.text[:200])
-            return False
+            return False, f"Server 酱 HTTP {resp.status_code}: {resp.text[:200]}"
 
-    async def _send_pushplus(self, title: str, body: str, games: List[dict]) -> bool:
-        """PushPlus 推送（微信/邮件/钉钉/飞书等，免费）
-
-        官方 API：https://www.pushplus.plus/send
-        POST JSON: {"token": "xxx", "title": "xxx", "content": "xxx", "template": "markdown", "channel": "wechat"}
-        """
-        if not self.token:
-            logger.error("PushPlus 配置错误：缺少 token（设置 NOTIFY_WEBHOOK_TOKEN）")
-            return False
-
-        content = body
-        if games:
-            content += "\n\n---\n本周免费游戏：\n"
-            for g in games[:10]:
-                title_g = g.get("title", "")
-                price = g.get("original_price", "")
-                end = g.get("end_date", "")[:10] if g.get("end_date") else ""
-                url = g.get("url", "")
-                line = f"- {title_g}"
-                if price:
-                    line += f" `({price}→免费)`"
-                if end:
-                    line += f" 截止{end}"
-                if url:
-                    line += f"\n  [领取]({url})"
-                content += line + "\n"
-
-        payload = {
-            "token": self.token,
-            "title": title,
-            "content": content,
-            "template": "markdown",
-            "channel": self.pushplus_channel,
-        }
-
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.post(
-                "https://www.pushplus.plus/send",
-                json=payload,
-            )
-            if resp.status_code == 200:
-                data = resp.json()
-                if data.get("code") == 200:
-                    logger.info("PushPlus 推送成功 (%s): %s", self.pushplus_channel, title)
-                    return True
-                logger.warning("PushPlus 推送失败: %s", data)
-                return False
-            logger.warning("PushPlus 推送 HTTP %s: %s", resp.status_code, resp.text[:200])
-            return False
-
-    async def _send_telegram(self, title: str, body: str, games: List[dict]) -> bool:
+    async def _send_telegram(self, title: str, body: str, games: List[dict]) -> tuple:
         """Telegram Bot 推送
 
         需要配置：
@@ -288,7 +186,7 @@ class Notifier:
                 "  NOTIFY_WEBHOOK_URL=https://api.telegram.org/bot{token}/sendMessage\n"
                 "  NOTIFY_WEBHOOK_TOKEN={chat_id}"
             )
-            return False
+            return False, "Telegram 配置错误：缺少 bot token 或 chat_id"
 
         text = f"*{title}*\n\n{body}"
         if games:
@@ -319,7 +217,7 @@ class Notifier:
                 data = resp.json()
                 if data.get("ok"):
                     logger.info("Telegram 推送成功: %s", title)
-                    return True
+                    return True, ""
                 # MarkdownV2 特殊字符可能转义失败，降级为纯文本重试
                 if "Bad Request" in str(data):
                     logger.info("Telegram MarkdownV2 转义失败，降级为纯文本重试")
@@ -334,34 +232,9 @@ class Notifier:
                         data = resp.json()
                         if data.get("ok"):
                             logger.info("Telegram 推送成功（纯文本降级）: %s", title)
-                            return True
+                            return True, ""
+                detail = data.get("description", str(data))
                 logger.warning("Telegram 推送失败: %s", data)
-                return False
+                return False, f"Telegram 返回错误: {detail}"
             logger.warning("Telegram 推送 HTTP %s: %s", resp.status_code, resp.text[:200])
-            return False
-
-    async def _send_generic(self, title: str, body: str, games: List[dict]) -> bool:
-        """通用 Webhook
-
-        POST JSON 到 NOTIFY_WEBHOOK_URL：
-        {
-            "title": "...",
-            "body": "...",
-            "games": [{"title": "...", "url": "...", "original_price": "...", "end_date": "..."}],
-            "timestamp": "2026-09-11T00:05:00+08:00"
-        }
-        """
-        payload = {
-            "title": title,
-            "body": body,
-            "games": games,
-            "timestamp": int(time.time()),
-        }
-
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.post(self.url, json=payload)
-            if resp.status_code in (200, 201, 202, 204):
-                logger.info("Generic webhook 推送成功: %s", title)
-                return True
-            logger.warning("Generic webhook HTTP %s: %s", resp.status_code, resp.text[:200])
-            return False
+            return False, f"Telegram HTTP {resp.status_code}: {resp.text[:200]}"

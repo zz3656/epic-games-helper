@@ -118,7 +118,7 @@ class UserStore:
                     "url": "",
                     "token": "",
                     "channel": "wechat",
-                },
+                },  # type: serverchan | telegram
             }
             self._save()
             logger.info("用户注册成功: %s", username)
@@ -191,7 +191,7 @@ class UserStore:
                 return False, "用户不存在"
 
             # 验证推送渠道类型
-            valid_types = ["bark", "serverchan", "pushplus", "telegram", "generic"]
+            valid_types = ["serverchan", "telegram"]
             push_config = user.get("push_config", {})
 
             if config.get("type"):

@@ -18,7 +18,7 @@
 - 🎮 **Free games** — weekly free games + next week's preview
 - 📜 **History archive** — permanent record grouped by ISO week
 - 🔗 **One-click store links** — direct navigation to Epic product pages
-- 📲 **Notification** — Webhook push (Bark / PushPlus / Server 酱 / Telegram)
+- 📲 **Notification** — Webhook push (Server 酱 / Telegram)
 - 🚫 **No login · No browser · No captcha**
 - 📦 Image size ~150 MB
 
@@ -36,7 +36,7 @@
 | Fully responsive UI (mobile/tablet) | ✅ |
 | APScheduler weekly check (Fri 00:05 BJ) | ✅ |
 | Fingerprint comparison (only record on changes) | ✅ |
-| Webhook notifications (Bark/PushPlus/Server 酱/Telegram) | ✅ |
+| Webhook notifications (Server 酱/Telegram) | ✅ |
 | Multi-arch Docker image | ✅ |
 | REST API + Swagger UI | ✅ |
 | Docker Compose support | ✅ |
@@ -67,7 +67,7 @@ Open **http://localhost:8080** — no login, no config.
 | `SCHEDULE_DAY` | `fri` | Trigger day |
 | `SCHEDULE_HOUR` | `0` | Trigger hour |
 | `SCHEDULE_MINUTE` | `5` | Trigger minute |
-| `NOTIFY_WEBHOOK_TYPE` | — | Notification channel: `bark`/`pushplus`/`serverchan`/`telegram`/`generic` |
+| `NOTIFY_WEBHOOK_TYPE` | — | Notification channel: `serverchan`/`telegram` |
 | `NOTIFY_WEBHOOK_URL` | — | Webhook URL |
 | `NOTIFY_WEBHOOK_TOKEN` | — | Token / device key / sendkey / chat_id |
 
@@ -75,8 +75,6 @@ Open **http://localhost:8080** — no login, no config.
 
 | Channel | Config | Notes |
 |---------|--------|-------|
-| **Bark** | iOS push app | `NOTIFY_WEBHOOK_TOKEN=bark-key` |
-| **PushPlus** | WeChat push (recommended) | `NOTIFY_WEBHOOK_TYPE=pushplus`, `PUSHPLUS_CHANNEL=wechat` |
 | **Server 酱** | WeChat push | `NOTIFY_WEBHOOK_TYPE=serverchan` |
 | **Telegram** | Bot to channel/group | `NOTIFY_WEBHOOK_TYPE=telegram` |
 

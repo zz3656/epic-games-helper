@@ -28,31 +28,9 @@ function createSettingsModal() {
                         <label for="push-type">选择推送渠道</label>
                         <select id="push-type">
                             <option value="">— 请选择 —</option>
-                            <option value="bark">📱 Bark — iOS 原生推送（推荐）</option>
                             <option value="serverchan">💬 Server 酱 — 微信推送</option>
-                            <option value="pushplus">📮 PushPlus — 微信/钉钉/飞书/邮件（推荐）</option>
                             <option value="telegram">✈️ Telegram Bot — 群组/频道推送</option>
-                            <option value="generic">🔗 通用 Webhook — 自定义 URL</option>
                         </select>
-                    </div>
-
-                    <!-- Bark 指引 -->
-                    <div class="push-config-group" id="config-bark" style="display:none;">
-                        <div class="push-guide" style="background:var(--epic-bg-secondary);border:1px solid var(--epic-border);border-radius:8px;padding:12px;margin-bottom:12px;font-size:12px;color:var(--epic-text-secondary);">
-                            <strong>📱 Bark 配置步骤：</strong><br>
-                            1. iOS App Store 搜索安装 <strong>Bark</strong><br>
-                            2. 打开 App → 点击"开始使用"<br>
-                            3. 复制你的 <strong>Device Key</strong>（一串字母数字）<br>
-                            4. 粘贴到下方即可
-                        </div>
-                        <div class="form-group">
-                            <label for="push-token-bark">Device Key</label>
-                            <input type="text" id="push-token-bark" placeholder="例如：ABC123def456ghi...">
-                        </div>
-                        <div class="form-group">
-                            <label for="push-url-bark">推送地址（可选）</label>
-                            <input type="text" id="push-url-bark" placeholder="https://api.day.app/...">
-                        </div>
                     </div>
 
                     <!-- Server 酱 指引 -->
@@ -67,32 +45,6 @@ function createSettingsModal() {
                         <div class="form-group">
                             <label for="push-token-serverchan">SendKey</label>
                             <input type="text" id="push-token-serverchan" placeholder="例如：SCT123456...">
-                        </div>
-                    </div>
-
-                    <!-- PushPlus 指引 -->
-                    <div class="push-config-group" id="config-pushplus" style="display:none;">
-                        <div class="push-guide" style="background:var(--epic-bg-secondary);border:1px solid var(--epic-border);border-radius:8px;padding:12px;margin-bottom:12px;font-size:12px;color:var(--epic-text-secondary);">
-                            <strong>📮 PushPlus 配置步骤：</strong><br>
-                            1. 微信搜索公众号 <strong>"PushPlus推送助手"</strong> 或访问 <a href="http://www.pushplus.plus" target="_blank" style="color:var(--epic-blue);">pushplus.plus</a><br>
-                            2. 点击"注册"获取你的 <strong>Token</strong><br>
-                            3. 选择推送方式（下方下拉菜单）<br>
-                            4. Token 粘贴到下方，然后保存
-                        </div>
-                        <div class="form-group">
-                            <label for="push-token-pushplus">Token</label>
-                            <input type="text" id="push-token-pushplus" placeholder="在 PushPlus 注册的 Token">
-                        </div>
-                        <div class="form-group">
-                            <label for="push-channel">推送方式</label>
-                            <select id="push-channel">
-                                <option value="wechat">微信公众号（推荐）</option>
-                                <option value="webhook">Webhook</option>
-                                <option value="email">邮件</option>
-                                <option value="sms">短信</option>
-                                <option value="bark">Bark</option>
-                                <option value="voice">语音</option>
-                            </select>
                         </div>
                     </div>
 
@@ -113,24 +65,6 @@ function createSettingsModal() {
                         <div class="form-group">
                             <label for="push-url-telegram">Bot Token</label>
                             <input type="text" id="push-url-telegram" placeholder="格式：123456:ABC-DEF1234...">
-                        </div>
-                    </div>
-
-                    <!-- 通用 Webhook 指引 -->
-                    <div class="push-config-group" id="config-generic" style="display:none;">
-                        <div class="push-guide" style="background:var(--epic-bg-secondary);border:1px solid var(--epic-border);border-radius:8px;padding:12px;margin-bottom:12px;font-size:12px;color:var(--epic-text-secondary);">
-                            <strong>🔗 通用 Webhook 配置说明：</strong><br>
-                            每周五检测到新游戏时，系统会向此 URL 发送 <strong>POST 请求</strong>，JSON 格式：<br>
-                            <pre style="background:#000;padding:8px;border-radius:4px;margin:8px 0 0;overflow-x:auto;font-size:11px;">{
-  "title": "🎮 Epic 本周 3 款免费游戏",
-  "body": "📅 本周免费领取...",
-  "games": [{"title":"游戏名","url":"...","original_price":"¥99.00","end_date":"..."}],
-  "timestamp": 1726080300
-}</pre>
-                        </div>
-                        <div class="form-group">
-                            <label for="push-url-generic">Webhook URL</label>
-                            <input type="url" id="push-url-generic" placeholder="https://your-server.com/epic-notify">
                         </div>
                     </div>
 
@@ -168,13 +102,10 @@ function createSettingsModal() {
         }
         // 根据所选渠道获取对应的 token / url 输入框
         const tokenMap = {
-            bark: '#push-token-bark',
             serverchan: '#push-token-serverchan',
-            pushplus: '#push-token-pushplus',
             telegram: '#push-token-telegram',
         };
         const urlMap = {
-            generic: '#push-url-generic',
             telegram: '#push-url-telegram',
         };
         const tokenSelector = tokenMap[pushType];
@@ -184,7 +115,7 @@ function createSettingsModal() {
             type: pushType,
             token: (tokenSelector && modal.querySelector(tokenSelector)?.value || '').trim(),
             url: (urlSelector && modal.querySelector(urlSelector)?.value || '').trim(),
-            channel: (modal.querySelector('#push-channel')?.value || 'wechat'),
+            channel: 'wechat',
         };
         try {
             const resp = await fetchWithAuth('/api/auth/push-config', {
@@ -268,9 +199,7 @@ function createSettingsModal() {
                 modal.querySelector('#push-type').dispatchEvent(new Event('change'));
                 if (data.type && data.has_token) {
                     const tokenMap = {
-                        bark: '#push-token-bark',
                         serverchan: '#push-token-serverchan',
-                        pushplus: '#push-token-pushplus',
                         telegram: '#push-token-telegram',
                     };
                     const tokenSelector = tokenMap[data.type];
