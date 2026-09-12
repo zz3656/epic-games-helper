@@ -49,6 +49,10 @@ function createSettingsModal() {
                             <label for="push-token-bark">Device Key</label>
                             <input type="text" id="push-token-bark" placeholder="例如：ABC123def456ghi...">
                         </div>
+                        <div class="form-group">
+                            <label for="push-url-bark">推送地址（可选）</label>
+                            <input type="text" id="push-url-bark" placeholder="https://api.day.app/...">
+                        </div>
                     </div>
 
                     <!-- Server 酱 指引 -->
