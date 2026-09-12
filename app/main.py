@@ -2,35 +2,24 @@
 FastAPI 主入口
 
 应用架构：
-- Device Auth 设备码授权（用户在浏览器完成 Epic 登录）
-- Epic HTTP API 调用（完全避开浏览器、hCaptcha、Playwright）
-- 定时调度（每周自动领取）
+- Epic HTTP API 调用（纯 HTTP，无浏览器，无验证码）
+- APScheduler 定时调度（每周拉取免费游戏 + 写入历史）
+- JWT 用户认证 + Webhook 通知推送
 """
-import asyncio
 import logging
 import os
-import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
-
-from fastapi import FastAPI, HTTPException, Request
+from typing import Optional
+from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, Field
 
 from app.config import load_config
-from app.credential_store import CredentialStore
 from app.scheduler import ClaimScheduler
 from app.storage import ResultStore
 from app.user_store import UserStore
-from app.auth import create_token, get_current_user, require_login
-
-# ============== 数据模型 ==============
-class AutoClaimToggle(BaseModel):
-    """开关自动领取请求体"""
-    enabled: bool
 
 # 日志
 logging.basicConfig(
@@ -42,15 +31,11 @@ logger = logging.getLogger(__name__)
 # 全局对象（在 lifespan 中初始化）
 config = load_config()
 store = ResultStore()
-cred_store = CredentialStore(key=os.getenv("EPIC_MASTER_KEY"))
 user_store = UserStore()
-auto_claim_default = os.getenv("AUTO_CLAIM_ENABLED", "false").lower() == "true"
 scheduler = ClaimScheduler(
     config=config,
     store=store,
-    credential_store=cred_store,
     user_store=user_store,
-    auto_claim_enabled=auto_claim_default,
 )
 
 
@@ -58,16 +43,11 @@ scheduler = ClaimScheduler(
 async def lifespan(app: FastAPI):
     # 启动
     scheduler.start()
-    if cred_store.has_device_auth():
-        logger.info("检测到已保存的 device auth（自动领取 %s）",
-                    "已启用" if auto_claim_default else "未启用")
-    else:
-        logger.info("未配置 device auth，需先通过 Web 端完成 Epic 设备码授权")
+    logger.info("定时任务已启动，每周五 0:05 检查 Epic 免费游戏更新")
     if user_store:
         users = user_store.list_users()
         logger.info("系统有 %d 个用户 (存储路径: %s)", len(users), user_store.path)
     logger.info("历史文件路径: %s", store.file_path)
-    logger.info("设备认证路径: %s", cred_store.device_auth_path)
     logger.info("Epic Games 免费游戏助手服务已启动")
     yield
     # 关闭
@@ -77,7 +57,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Epic Games Store Tracker",
-    description="Epic Games 商店折扣追踪 · 免费游戏跟踪 · 领取历史 · 设备码授权",
+    description="Epic Games 商店折扣追踪 · 免费游戏跟踪 · 领取历史 · 通知推送",
     version="3.0.0",
     lifespan=lifespan,
 )
@@ -85,13 +65,6 @@ app = FastAPI(
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
-
-# 注册 device auth 路由
-from app.api_device_auth import router as device_auth_router, set_credential_store
-app.include_router(device_auth_router)
-
-# 注入凭据存储
-set_credential_store(cred_store)
 
 # 注册封面代理路由（让国内用户走本地中转，加载 Epic CDN 封面图）
 from app.api_cover_proxy import router as cover_proxy_router
@@ -118,8 +91,6 @@ async def index(request: Request):
                 "minute": config.schedule_minute,
                 "timezone": config.timezone,
             },
-            "auto_claim_enabled": scheduler.auto_claim_enabled,
-            "device_auth_configured": cred_store.has_device_auth(),
         },
     )
 
@@ -136,24 +107,6 @@ async def health():
             "timezone": config.timezone,
             "next_run": scheduler.get_next_run_time(),
         },
-    }
-
-
-@app.get("/api/credentials/status")
-async def credentials_status():
-    """查询凭证状态（仅 device auth）"""
-    return cred_store.status()
-
-
-@app.post("/api/auto-claim/toggle")
-async def toggle_auto_claim(req: AutoClaimToggle):
-    """开关自动领取（不影响已保存的 device auth）"""
-    if req.enabled and not cred_store.has_device_auth():
-        raise HTTPException(status_code=400, detail="未配置 device auth，请先完成 Epic 设备码授权")
-    scheduler.enable_auto_claim(req.enabled)
-    return {
-        "success": True,
-        "auto_claim_enabled": scheduler.auto_claim_enabled,
     }
 
 

@@ -285,8 +285,7 @@ epic-games-helper/
 
 ## 🙏 Credits
 
-- **[claabs/epicgames-freegames-node](https://github.com/claabs/epicgames-freegames-node)** — Device Code OAuth + checkout URL approach
-- **[MixV2/EpicResearch](https://github.com/MixV2/EpicResearch)** — Epic API documentation
+- **[MixV2/EpicResearch](https://github.com/MixV2/EpicResearch)** — Epic `freeGamesPromotions` API endpoint & response structure documentation
 
 ---
 

@@ -92,7 +92,7 @@
 | 状态 | 功能 | 原因 |
 |------|------|------|
 | ❌ | 真正零点击自动领取 | Epic 需要浏览器 session cookie、XSRF token、hCaptcha — 无法通过 API 伪造 |
-| ❌ | 设备码授权 / 自动领取 | 不需要 — 免费游戏数据是公开的；设备码授权和自动领取不在此项目范围内 |
+| ❌ | 自动领取 | 不需要 — 免费游戏数据是公开的，本项目仅提供追踪与历史记录 |
 | ❌ | 完整游戏库 | Epic `library-service` API 需要 OAuth authorization_code flow，Epic 不允许 localhost redirect_uri |
 
 ---
@@ -287,8 +287,7 @@ epic-games-helper/
 
 ## 🙏 致谢
 
-- **[claabs/epicgames-freegames-node](https://github.com/claabs/epicgames-freegames-node)** — 设备码授权 + checkout URL 思路
-- **[MixV2/EpicResearch](https://github.com/MixV2/EpicResearch)** — Epic API 详尽逆向文档
+- **[MixV2/EpicResearch](https://github.com/MixV2/EpicResearch)** — Epic `freeGamesPromotions` API 接口与响应结构文档
 
 ---
 

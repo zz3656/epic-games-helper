@@ -28,7 +28,6 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from app.config import Config, DAY_MAP
-from app.credential_store import CredentialStore
 from app.epic_api import EpicAPIClient, DeviceAuthCredentials
 from app.notifier import Notifier
 from app.result import ClaimResult, FreeGame
@@ -44,13 +43,10 @@ class ClaimScheduler:
         self,
         config: Config,
         store: ResultStore,
-        credential_store: CredentialStore,
         user_store=None,
-        auto_claim_enabled: bool = False,
     ):
         self.config = config
         self.store = store
-        self.cred_store = credential_store
         self.user_store = user_store  # 用户存储（多租户推送）
         self.auto_claim_enabled = auto_claim_enabled  # 已废弃，保留仅为兼容
         self.scheduler = AsyncIOScheduler(timezone=config.timezone)
