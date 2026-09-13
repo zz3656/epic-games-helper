@@ -83,7 +83,7 @@ fi
 # volume 挂载会覆盖镜像层文件，所以默认数据放在 /opt/data/ 下
 # 检查 volume 中的数据，不存在或为空则从 /opt/data/ 恢复
 # ============================================
-OPT_DEFAULTS="/opt/data"
+OPT_DEFAULTS="/var/epic-defaults/"
 
 init_data_file() {
     local target="$1"
@@ -115,7 +115,7 @@ os.makedirs('/app/data', exist_ok=True)
 data = {'users': []}
 with open('/app/data/users.json', 'w') as f:
     json.dump(data, f, ensure_ascii=False, indent=2)
-" &
+"
     echo "[INFO] Empty users.json created at ${USER_STORE_PATH}"
 else
     echo "[INFO] Using existing users.json"

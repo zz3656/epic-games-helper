@@ -33,15 +33,20 @@ COPY scripts/ ./scripts/
 # 创建数据目录
 RUN mkdir -p /app/logs /app/screenshots /app/data
 
-# 创建默认数据目录（volume 挂载后会覆盖 /app/logs /app/data，所以默认数据放在 /opt/data/ 下）
-RUN mkdir -p /opt/data/logs /opt/data/data
+# 复制默认数据文件到 /var/epic-defaults/（使用独立 RUN 避免 volume 挂载影响）
+COPY logs/history.json /tmp/_epic_data/logs/history.json
+COPY logs/cover_map.json /tmp/_epic_data/logs/cover_map.json
+COPY logs/cover_map_v2.json /tmp/_epic_data/logs/cover_map_v2.json
+COPY data/low_prices.json /tmp/_epic_data/data/low_prices.json
+COPY logs/url_fixes.json /tmp/_epic_data/logs/url_fixes.json
 
-# 复制默认数据文件到 /opt/data/（首次启动时若 volume 数据为空则恢复）
-COPY logs/history.json /opt/data/logs/history.json
-COPY logs/cover_map.json /opt/data/logs/cover_map.json
-COPY logs/cover_map_v2.json /opt/data/logs/cover_map_v2.json
-COPY data/low_prices.json /opt/data/data/low_prices.json
-COPY logs/url_fixes.json /opt/data/logs/url_fixes.json
+RUN mkdir -p /var/epic-defaults/logs /var/epic-defaults/data && \
+    cp /tmp/_epic_data/logs/history.json /var/epic-defaults/logs/ && \
+    cp /tmp/_epic_data/logs/cover_map.json /var/epic-defaults/logs/ && \
+    cp /tmp/_epic_data/logs/cover_map_v2.json /var/epic-defaults/logs/ && \
+    cp /tmp/_epic_data/data/low_prices.json /var/epic-defaults/data/ && \
+    cp /tmp/_epic_data/logs/url_fixes.json /var/epic-defaults/logs/ && \
+    rm -rf /tmp/_epic_data
 
 # 复制启动脚本
 COPY scripts/entrypoint.sh /entrypoint.sh
