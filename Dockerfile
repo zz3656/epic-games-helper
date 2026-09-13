@@ -41,7 +41,7 @@ COPY logs/history.json /opt/data/logs/history.json
 COPY logs/cover_map.json /opt/data/logs/cover_map.json
 COPY logs/cover_map_v2.json /opt/data/logs/cover_map_v2.json
 COPY data/low_prices.json /opt/data/data/low_prices.json
-COPY data/url_fixes.json /opt/data/data/url_fixes.json
+COPY logs/url_fixes.json /opt/data/logs/url_fixes.json
 
 # 复制启动脚本
 COPY scripts/entrypoint.sh /entrypoint.sh
