@@ -79,6 +79,30 @@ else
 fi
 
 # ============================================
+# 初始化数据文件
+# volume 挂载会覆盖镜像层文件，所以默认数据放在 /opt/data/ 下
+# 检查 volume 中的数据，不存在或为空则从 /opt/data/ 恢复
+# ============================================
+OPT_DEFAULTS="/opt/data"
+
+init_data_file() {
+    local target="$1"
+    local default_file="${OPT_DEFAULTS}${target#/app/}"
+    if [ ! -f "$target" ] || [ ! -s "$target" ]; then
+        if [ -f "$default_file" ]; then
+            echo "[INFO] ${target} not found or empty, restoring from defaults..."
+            cp "$default_file" "$target"
+        else
+            echo "[INFO] ${target} not found or empty (no default available)"
+        fi
+    fi
+}
+
+init_data_file "/app/logs/history.json"
+init_data_file "/app/logs/cover_map.json"
+init_data_file "/app/data/low_prices.json"
+
+# ============================================
 # 初始化用户数据存储
 # ============================================
 USER_STORE_PATH="/app/data/users.json"
